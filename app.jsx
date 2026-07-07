@@ -745,6 +745,7 @@ function App() {
     const a = document.createElement("a"); a.href = url; a.download = `${tabKey}.csv`; a.click(); URL.revokeObjectURL(url);
   };
   const resetAll = () => { if (window.confirm("Reset every tab to the original seed data? Your edits will be lost.")) setData(seed()); };
+  const downloadBackup = () => { const today = new Date().toISOString().slice(0, 10); const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = `phd_dashboard_backup_${today}.json`; a.click(); URL.revokeObjectURL(url); };
 
   const m = useMemo(() => {
     const T = data.timeline, C = data.contacts, E = data.events, P = data.publications, IV = data.interviews;
@@ -789,6 +790,7 @@ function App() {
             <div style={{ fontSize: 11, color: "#D9CCE6", textAlign: "right" }}>
               {savedAt ? `${L("saved")} ${savedAt.toLocaleTimeString()}` : (loaded ? L("savedAuto") : L("loading"))}
               <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginTop: 3 }}>
+                <button onClick={downloadBackup} title={lang === "th" ? "ดาวน์โหลดสำเนาข้อมูลทั้งหมด (JSON)" : "download a full JSON backup of all your data"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>⤓ {lang === "th" ? "สำรอง" : "Backup"}</button>
                 <button onClick={reloadFromCloud} title={lang === "th" ? "ดึงข้อมูลล่าสุดจากอุปกรณ์อื่น" : "pull latest from other devices"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>⟳ {lang === "th" ? "ซิงค์" : "Sync"}</button>
                 <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#D9CCE6", cursor: "pointer" }}><input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} />{lang === "th" ? "ไลฟ์" : "Live"}</label>
               </div>
@@ -1811,6 +1813,26 @@ function AddHub({ data, setData, quickAdd, lang }) {
   const exportAll = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = `phd_dashboard_backup_${today}.json`; a.click(); URL.revokeObjectURL(url); };
   const importAll = e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const p = JSON.parse(r.result); if (p && typeof p === "object" && p.timeline && window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมดด้วยไฟล์นี้? (แนะนำให้สำรองก่อน)" : "Replace ALL current data with this file? (Export a backup first if unsure.)")) setData(p); else if (!p.timeline) window.alert("This doesn't look like a dashboard backup file."); } catch (err) { window.alert(lang === "th" ? "อ่านไฟล์ JSON ไม่ได้" : "Could not read that file as JSON."); } }; r.readAsText(f); e.target.value = ""; };
 
+  // paste-JSON import: append rows into matching stores, or replace everything with a full backup
+  const [pasteText, setPasteText] = useState("");
+  const [pasteMsg, setPasteMsg] = useState(null);
+  const IMPORT_STORES = ["timeline", "contacts", "events", "publications", "supervisor", "activity", "interviews", "tasks", "sources", "outputs", "ideas", "reflections", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence", "researchHistory", "researchPlan", "supervisorTeam"];
+  const importPaste = mode => {
+    let parsed;
+    try { parsed = JSON.parse(pasteText); } catch (err) { setPasteMsg({ ok: false, text: lang === "th" ? "อ่าน JSON ไม่ได้ — ตรวจสอบรูปแบบ" : "Couldn't read that as JSON — check the format." }); return; }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) { setPasteMsg({ ok: false, text: lang === "th" ? 'ต้องเป็นออบเจ็กต์ เช่น { "activity": [ … ] }' : 'Paste an object like { "activity": [ … ], "contacts": [ … ] }.' }); return; }
+    if (mode === "replace") {
+      if (!parsed.timeline) { setPasteMsg({ ok: false, text: lang === "th" ? "ไม่ใช่ไฟล์สำรองเต็ม (ไม่มี timeline) — ใช้โหมดเพิ่มแทน" : "That isn't a full backup (no timeline) — use Add instead." }); return; }
+      if (!window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมด? (สำรองก่อนถ้าไม่แน่ใจ)" : "Replace ALL current data with this? (Back up first if unsure.)")) return;
+      setData(parsed); setPasteMsg({ ok: true, text: lang === "th" ? "แทนที่ข้อมูลทั้งหมดแล้ว" : "Replaced all data." }); setPasteText(""); return;
+    }
+    const summary = IMPORT_STORES.filter(k => Array.isArray(parsed[k]) && parsed[k].length).map(k => `${parsed[k].length} ${k}`);
+    if (!summary.length) { setPasteMsg({ ok: false, text: lang === "th" ? "ไม่พบรายการที่รู้จัก (เช่น activity, contacts, tasks)" : "No known lists found (e.g. activity, contacts, tasks). Check the keys." }); return; }
+    setData(d => { const nd = { ...d }; IMPORT_STORES.forEach(k => { if (Array.isArray(parsed[k]) && parsed[k].length) { const items = parsed[k].map(it => (it && typeof it === "object" && !Array.isArray(it)) ? { _a: [], ...it } : it); nd[k] = [...(Array.isArray(nd[k]) ? nd[k] : []), ...items]; } }); return nd; });
+    setPasteMsg({ ok: true, text: (lang === "th" ? "เพิ่มแล้ว: " : "Added: ") + summary.join(", ") });
+    setPasteText("");
+  };
+
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>{lang === "th" ? "เพิ่มข้อมูลครั้งเดียว แสดงผลได้หลายที่" : "Capture once — shown in many places"}</div>
@@ -1845,6 +1867,18 @@ function AddHub({ data, setData, quickAdd, lang }) {
             <input type="file" accept="application/json,.json" onChange={importAll} style={{ display: "none" }} />
           </label>
         </div>
+      </div>
+
+      <div style={{ marginTop: 16, background: OFF, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 4 }}>{lang === "th" ? "วางข้อมูล JSON เพื่อเพิ่ม" : "Paste JSON to add data"}</div>
+        <div style={{ fontSize: 11, color: GREY, marginBottom: 8 }}>{lang === "th" ? "วางออบเจ็กต์ที่คีย์เป็นชื่อแท็บ (เช่น activity, contacts, tasks) แล้วกด “เพิ่มเข้าข้อมูล” — รายการจะถูกเพิ่มต่อท้าย ไม่มีการทับข้อมูลเดิม" : "Paste an object whose keys are tab names (activity, contacts, tasks…). “Add to my data” appends the rows — nothing existing is overwritten."}</div>
+        <textarea value={pasteText} onChange={e => { setPasteText(e.target.value); setPasteMsg(null); }} spellCheck={false} placeholder={'{\n  "activity": [\n    { "date": "2026-07-10", "category": "Meeting", "activity": "Met supervisor", "role": "PhD" }\n  ],\n  "contacts": [\n    { "name": "Jane Doe", "org": "UCL", "category": "Academic collaborator" }\n  ]\n}'} style={{ width: "100%", boxSizing: "border-box", minHeight: 120, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px", fontSize: 12, fontFamily: "ui-monospace, Menlo, monospace", resize: "vertical" }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+          <button onClick={() => importPaste("add")} disabled={!pasteText.trim()} style={{ background: pasteText.trim() ? AUB : "#B9A9CC", color: "#fff", border: "none", borderRadius: 6, padding: "8px 14px", cursor: pasteText.trim() ? "pointer" : "default", fontSize: 12, fontWeight: 700 }}>{lang === "th" ? "เพิ่มเข้าข้อมูล" : "Add to my data"}</button>
+          <button onClick={() => importPaste("replace")} disabled={!pasteText.trim()} style={{ background: "#fff", color: RED, border: `1px solid ${pasteText.trim() ? RED : BORDER}`, borderRadius: 6, padding: "8px 14px", cursor: pasteText.trim() ? "pointer" : "default", fontSize: 12 }}>{lang === "th" ? "แทนที่ทั้งหมด (ไฟล์สำรองเต็ม)" : "Replace all (full backup)"}</button>
+          {pasteMsg && <span style={{ fontSize: 12, fontWeight: 600, color: pasteMsg.ok ? GREEN : RED }}>{pasteMsg.ok ? "✓ " : "⚠ "}{pasteMsg.text}</span>}
+        </div>
+        <div style={{ fontSize: 10.5, color: GREY, marginTop: 8, lineHeight: 1.5 }}>{lang === "th" ? "คีย์ที่รองรับ: " : "Supported keys: "}<span style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>activity, contacts, tasks, events, publications, interviews, timeline, supervisor, sources, outputs, ideas, reflections, teachingSessions, guestLectures, supervision, marking, teachingEvidence</span></div>
       </div>
     </div>
   );
