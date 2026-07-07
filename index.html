@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PhD Journey Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #FAFAFA; font-family: Arial, Helvetica, sans-serif; }
+  #root { min-height: 100vh; }
+  /* ---- passphrase gate ---- */
+  #gate { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center;
+          background: linear-gradient(160deg, #2B1241 0%, #4a2d6b 100%); padding: 20px; }
+  .gate-card { background: #fff; border-radius: 16px; width: 380px; max-width: 100%; padding: 28px 26px;
+               box-shadow: 0 18px 60px rgba(0,0,0,.35); }
+  .gate-card h1 { margin: 0 0 4px; font-size: 20px; color: #2B1241; }
+  .gate-card .sub { font-size: 13px; color: #6B4E8C; margin-bottom: 18px; line-height: 1.4; }
+  .gate-card label { display: block; font-size: 11px; font-weight: 700; color: #6B4E8C; text-transform: uppercase;
+                     letter-spacing: .4px; margin: 12px 0 4px; }
+  .gate-card input { width: 100%; border: 1px solid #E5E5E5; border-radius: 8px; padding: 10px 12px; font-size: 15px; }
+  .gate-card input:focus { outline: none; border-color: #6B4E8C; }
+  .gate-card button.go { width: 100%; margin-top: 18px; background: #2B1241; color: #fff; border: none; border-radius: 8px;
+                         padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .gate-card button.go:hover { background: #3d1c5e; }
+  #gateErr { color: #DC2626; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+  #cfgBanner { display: none; background: #FFF7E6; border: 1px solid #ED6C02; color: #8a5a00; font-size: 11.5px;
+               border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; line-height: 1.4; }
+  #gateHint { font-size: 11px; color: #9E9E9E; margin-top: 14px; line-height: 1.45; }
+  #lockBtn { position: fixed; bottom: 12px; right: 12px; z-index: 40; background: rgba(43,18,65,.9); color: #fff;
+             border: none; border-radius: 999px; padding: 7px 13px; font-size: 12px; cursor: pointer; display: none;
+             box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <div id="cfgBanner"></div>
+    <h1>🎓 PhD Journey Tracker</h1>
+    <div class="sub" id="gateSub">Enter your passphrase.</div>
+    <label for="pass">Passphrase</label>
+    <input id="pass" type="password" autocomplete="current-password" placeholder="your passphrase" />
+    <div id="confirmWrap" style="display:none">
+      <label for="pass2">Confirm passphrase</label>
+      <input id="pass2" type="password" autocomplete="new-password" placeholder="type it again" />
+    </div>
+    <button class="go" id="gateGo">Unlock</button>
+    <div id="gateErr"></div>
+    <div id="gateHint">Your data is encrypted in this browser with this passphrase before it is saved to the cloud.
+      Use the <b>same passphrase on every device</b>. There is no reset — if you forget it, the cloud copy can't be
+      recovered (keep a JSON backup from the <b>Add</b> tab).</div>
+  </div>
+</div>
+
+<div id="root"></div>
+<button id="lockBtn" title="Lock &amp; reload">🔒 Lock</button>
+
+<!-- ============================================================
+     CONFIG  —  fill these in after creating your Supabase project
+     (see README.md, Part A). Until you do, the app runs in
+     local-only mode on this device (still encrypted).
+============================================================ -->
+<script>
+  const SUPABASE_URL      = "https://qyblhqepgehixjxtjyxn.supabase.co";              // <-- Project URL
+  const SUPABASE_ANON_KEY = "sb_publishable_8uBKOxp930FYlQcptv1cow_Ae81PVjZ";        // <-- publishable (public) key
+  const TABLE  = "phd_state";
+  const DOC_ID = "phd-journey-7c3f9a2e";  // your private row id (change if you want a fresh, separate store)
+</script>
+
+<!-- ============================================================
+     Storage shim: encrypts data (AES-GCM) then reads/writes one
+     Supabase row. The React app talks only to window.storage,
+     so it never sees the database or your passphrase.
+============================================================ -->
+<script>
+(function () {
+  const configured = !/YOUR-PROJECT/.test(SUPABASE_URL) && (SUPABASE_ANON_KEY || "").length > 20;
+  const REST = SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/" + TABLE;
+  const HDRS = { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY, "Content-Type": "application/json" };
+  const LC = "phdblob:" + DOC_ID;                       // local encrypted cache / offline copy
+  const te = new TextEncoder(), td = new TextDecoder();
+  const SALT = te.encode("phd-journey::" + DOC_ID);
+  let CKEY = null;
+
+  // ---- crypto helpers ----
+  async function deriveKey(pass) {
+    const base = await crypto.subtle.importKey("raw", te.encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt: SALT, iterations: 150000, hash: "SHA-256" },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  function b64e(bytes) { let s = ""; const a = new Uint8Array(bytes); for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); }
+  function b64d(str) { const s = atob(str); const a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+  async function enc(text) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, CKEY, te.encode(text)));
+    const out = new Uint8Array(iv.length + ct.length); out.set(iv, 0); out.set(ct, iv.length); return b64e(out);
+  }
+  async function dec(blob) {
+    const raw = b64d(blob), iv = raw.slice(0, 12), ct = raw.slice(12);
+    return td.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, CKEY, ct));
+  }
+
+  // ---- transport (Supabase REST, with localStorage fallback/cache) ----
+  async function remoteGet() {
+    const r = await fetch(REST + "?key=eq." + encodeURIComponent(DOC_ID) + "&select=value", { headers: HDRS });
+    if (!r.ok) throw new Error("get " + r.status);
+    const rows = await r.json(); return rows[0] ? rows[0].value : null;
+  }
+  async function remoteSet(blob) {
+    const r = await fetch(REST + "?on_conflict=key", {
+      method: "POST",
+      headers: { ...HDRS, Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([{ key: DOC_ID, value: blob, updated_at: new Date().toISOString() }]),
+    });
+    if (!r.ok) throw new Error("set " + r.status);
+  }
+  async function fetchBlob() {
+    if (configured) { try { const v = await remoteGet(); if (v != null) localStorage.setItem(LC, v); return v; } catch (e) { return localStorage.getItem(LC); } }
+    return localStorage.getItem(LC);
+  }
+  async function storeBlob(blob) {
+    localStorage.setItem(LC, blob);
+    if (configured) await remoteSet(blob);
+  }
+
+  // ---- the interface the React app uses ----
+  window.storage = {
+    async get() { const b = await fetchBlob(); if (b == null) return null; try { return { value: await dec(b) }; } catch (e) { console.warn("decrypt failed"); return null; } },
+    async set(_k, value) { await storeBlob(await enc(value)); },
+  };
+
+  // ---- passphrase gate ----
+  const $ = id => document.getElementById(id);
+  function launchApp() { window.__READY_TO_MOUNT__ = true; if (window.mountPhDApp) window.mountPhDApp(); $("lockBtn").style.display = "block"; }
+
+  async function boot() {
+    if (!configured) { const b = $("cfgBanner"); b.style.display = "block"; b.innerHTML = "⚠ Running in <b>local-only mode</b> on this device. Add your Supabase keys in <code>index.html</code> to sync across devices (see README)."; }
+    if (!(window.crypto && crypto.subtle)) { $("gateSub").textContent = "This browser blocks encryption on insecure pages. Open the site over https:// (GitHub Pages) or http://localhost."; }
+    let blob = null; try { blob = await fetchBlob(); } catch (e) {}
+    window.__EXISTING__ = blob;
+    const creating = !blob;
+    $("gateSub").textContent = creating ? "Create a passphrase to protect your data." : "Enter your passphrase to unlock.";
+    $("confirmWrap").style.display = creating ? "block" : "none";
+    $("gateGo").textContent = creating ? "Create & open" : "Unlock";
+    $("gate").style.display = "flex";
+    $("pass").focus();
+  }
+
+  async function submit() {
+    const pass = $("pass").value, err = $("gateErr"); err.textContent = "";
+    if (pass.length < 4) { err.textContent = "Use at least 4 characters."; return; }
+    const existing = window.__EXISTING__;
+    if (!existing) { if (pass !== $("pass2").value) { err.textContent = "Passphrases do not match."; return; } }
+    $("gateGo").disabled = true; $("gateGo").textContent = "Working…";
+    try {
+      CKEY = await deriveKey(pass);
+      if (existing) {
+        try { await dec(existing); } catch (e) { err.textContent = "Wrong passphrase — try again."; CKEY = null; $("gateGo").disabled = false; $("gateGo").textContent = "Unlock"; return; }
+      } else {
+        try { await storeBlob(await enc(JSON.stringify({ __init: true }))); } catch (e) {}  // establish the row so other devices see "unlock"
+      }
+    } catch (e) { err.textContent = "Something went wrong: " + e.message; $("gateGo").disabled = false; return; }
+    $("gate").style.display = "none";
+    launchApp();
+  }
+
+  $("gateGo").addEventListener("click", submit);
+  ["pass", "pass2"].forEach(id => $(id).addEventListener("keydown", e => { if (e.key === "Enter") submit(); }));
+  $("lockBtn").addEventListener("click", () => location.reload());
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+})();
+</script>
+
+<!-- React + in-browser JSX (no build step needed) -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script type="text/babel" data-presets="react" src="./app.jsx"></script>
+
+</body>
+</html>
