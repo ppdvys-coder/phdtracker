@@ -772,7 +772,7 @@ function App() {
     if (r._a && r._a.includes(key)) r._a = r._a.filter(k => k !== key); rows[idx] = r; return { ...d, [tabKey]: rows };
   });
   const addRow = tabKey => setData(d => { const b = { _a: [] }; cols[tabKey].forEach(c => b[c.k] = c.type === "number" ? 0 : ""); return { ...d, [tabKey]: [...d[tabKey], b] }; });
-  const delRow = (tabKey, idx) => { pushUndo(); setData(d => { const row = d[tabKey][idx]; const item = { _tid: Math.random().toString(36).slice(2, 10), store: tabKey, ts: Date.now(), row }; return { ...d, [tabKey]: d[tabKey].filter((_, i) => i !== idx), trash: [...(d.trash || []), item] }; }); };
+  const delRow = (tabKey, idx) => { if (!window.confirm(lang === "th" ? "ลบรายการนี้? (ย้ายไปถังขยะ — กู้คืนได้จากปุ่ม 🗑)" : "Delete this item? (moves to Trash — you can restore it from 🗑)")) return; pushUndo(); setData(d => { const row = d[tabKey][idx]; const item = { _tid: Math.random().toString(36).slice(2, 10), store: tabKey, ts: Date.now(), row }; return { ...d, [tabKey]: d[tabKey].filter((_, i) => i !== idx), trash: [...(d.trash || []), item] }; }); };
   // ---- Trash: soft-deleted rows live in data.trash until restored or emptied ----
   const restoreTrash = tid => setData(d => { const it = (d.trash || []).find(t => t._tid === tid); if (!it) return d; return { ...d, [it.store]: [...(d[it.store] || []), it.row], trash: (d.trash || []).filter(t => t._tid !== tid) }; });
   const restoreAllTrash = () => setData(d => { const nd = { ...d }; (d.trash || []).forEach(it => { nd[it.store] = [...(nd[it.store] || []), it.row]; }); nd.trash = []; return nd; });
