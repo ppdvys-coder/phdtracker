@@ -107,15 +107,20 @@ const ACT_COLOR = { "Meeting":"#ED6C02","Interview":"#0277BD","Note":"#455A64","
   "Milestone":"#2E7D32","Other":"#9E9E9E","Uncategorised":"#9E9E9E" };
 
 // ---- Roles (timeline-based) ----
-const ROLES = ["PhD","PGTA","Lecturer","Service/Admin","Personal"];
+const ROLES = ["PhD","Chula Lecturer","BSSC Lecturer","BSSC PGTA","Service/Admin","Personal"];
 const ROLE_META = {
-  "PhD":{th:"ปริญญาเอก", c:"#2B1241", period:"Sep 2023 – present"},
-  "PGTA":{th:"ผู้ช่วยสอน (PGTA)", c:"#0277BD", period:"2024 – Oct 2025"},
-  "Lecturer":{th:"อาจารย์ (Lecturer)", c:"#00796B", period:"Nov 2025 – present"},
-  "Service/Admin":{th:"บริการ / ธุรการ", c:"#5D7079", period:""},
-  "Personal":{th:"ส่วนตัว", c:"#ED6C02", period:""},
+  "PhD":{th:"ปริญญาเอก", c:"#2B1241", period:"Sep 2023 – present", start:"2023-09-25"},
+  "Chula Lecturer":{th:"อาจารย์ จุฬาฯ", c:"#C2185B", period:"Sep 2024 – present", start:"2024-09-01"},
+  "BSSC Lecturer":{th:"อาจารย์ BSSC", c:"#00796B", period:"Nov 2025 – present", start:"2025-11-01"},
+  "BSSC PGTA":{th:"ผู้ช่วยสอน BSSC (PGTA)", c:"#0277BD", period:"Jan 2025 – present", start:"2025-01-13"},
+  "Service/Admin":{th:"บริการ / ธุรการ", c:"#5D7079", period:"", start:""},
+  "Personal":{th:"ส่วนตัว", c:"#ED6C02", period:"", start:""},
+  // legacy aliases so pre-migration data still resolves labels/colours
+  "Lecturer":{th:"อาจารย์ BSSC", c:"#00796B", period:"Nov 2025 – present"},
+  "PGTA":{th:"ผู้ช่วยสอน BSSC (PGTA)", c:"#0277BD", period:"Jan 2025 – present"},
   "Teaching":{th:"งานสอน", c:"#0277BD", period:""},
 };
+const roleStart = r => ROLE_META[r] ? (ROLE_META[r].start || "") : "";
 const roleLab = (lang,r) => lang==="th" ? (ROLE_META[r] ? ROLE_META[r].th : r) : r;
 const roleColor = r => ROLE_META[r] ? ROLE_META[r].c : GREY;
 const rolePeriod = r => ROLE_META[r] ? (ROLE_META[r].period || "") : "";
@@ -155,10 +160,11 @@ function teachRecs(data) {
 // unified role-tagged records for workload (activity + lecturer stores)
 function roleRecords(data) {
   const out = [];
+  const teachHat = r => /pgta/i.test(r || "") ? "BSSC PGTA" : "BSSC Lecturer";
   (data.activity || []).forEach(r => out.push({ role: roleOf(r), hours: Number(r.hours) || 0, date: r.date || "", activity: r.activity || "", category: r.category || "" }));
-  (data.teachingSessions || []).forEach(r => out.push({ role: r.role || "Lecturer", hours: Number(r.hours) || 0, date: r.date || "", activity: r.title || "", category: "Teaching session" }));
-  (data.marking || []).forEach(r => out.push({ role: "Lecturer", hours: Number(r.hours) || 0, date: r.date || "", activity: `Marking: ${r.title || ""}`, category: "Marking" }));
-  (data.guestLectures || []).forEach(r => out.push({ role: "Lecturer", hours: Number(r.hours) || 0, date: r.date || "", activity: `Guest lecture: ${r.title || ""}`, category: "Guest lecture" }));
+  (data.teachingSessions || []).forEach(r => out.push({ role: teachHat(r.role), hours: Number(r.hours) || 0, date: r.date || "", activity: r.title || "", category: "Teaching session" }));
+  (data.marking || []).forEach(r => out.push({ role: "BSSC Lecturer", hours: Number(r.hours) || 0, date: r.date || "", activity: `Marking: ${r.title || ""}`, category: "Marking" }));
+  (data.guestLectures || []).forEach(r => out.push({ role: "BSSC Lecturer", hours: Number(r.hours) || 0, date: r.date || "", activity: `Guest lecture: ${r.title || ""}`, category: "Guest lecture" }));
   return out;
 }
 
@@ -493,19 +499,21 @@ const TABS = [
   {k:"publications", group:"phd", ic:"📄", en:"Publications", th:"ผลงานตีพิมพ์"},
   {k:"supervisor", group:"phd", ic:"🧑‍🏫", en:"Supervisor", th:"อาจารย์ที่ปรึกษา"},
   {k:"events", group:"phd", ic:"🎓", en:"Events & Training", th:"กิจกรรม & อบรม"},
-  {k:"lecdash", group:"lecturer", ic:"🍎", en:"Lecturer Dashboard", th:"แดชบอร์ดอาจารย์"},
-  {k:"teachingSessions", group:"lecturer", ic:"📚", en:"Teaching Sessions", th:"คาบสอน"},
-  {k:"guestLectures", group:"lecturer", ic:"🎤", en:"Guest Lectures", th:"บรรยายรับเชิญ"},
-  {k:"supervision", group:"lecturer", ic:"🧑‍🎓", en:"Supervision", th:"การควบคุมนักศึกษา"},
-  {k:"marking", group:"lecturer", ic:"✍️", en:"Assessment & Marking", th:"ตรวจงาน"},
-  {k:"teachingEvidence", group:"lecturer", ic:"🗂️", en:"Teaching Evidence", th:"หลักฐานการสอน"},
-  {k:"lecexport", group:"lecturer", ic:"📤", en:"Export Centre", th:"ศูนย์ส่งออก"},
+  {k:"lecdash", group:"bssc", ic:"🍎", en:"Lecturer Dashboard", th:"แดชบอร์ดอาจารย์"},
+  {k:"teachingSessions", group:"bssc", ic:"📚", en:"Teaching Sessions", th:"คาบสอน"},
+  {k:"guestLectures", group:"bssc", ic:"🎤", en:"Guest Lectures", th:"บรรยายรับเชิญ"},
+  {k:"supervision", group:"bssc", ic:"🧑‍🎓", en:"Supervision", th:"การควบคุมนักศึกษา"},
+  {k:"marking", group:"bssc", ic:"✍️", en:"Assessment & Marking", th:"ตรวจงาน"},
+  {k:"teachingEvidence", group:"bssc", ic:"🗂️", en:"Teaching Evidence", th:"หลักฐานการสอน"},
+  {k:"lecexport", group:"bssc", ic:"📤", en:"Export Centre", th:"ศูนย์ส่งออก"},
+  {k:"personal", group:"personal", ic:"🌱", en:"Personal", th:"ส่วนตัว"},
   {k:"cv", group:"cv", ic:"📋", en:"CV", th:"ประวัติย่อ (CV)"},
 ];
 const GROUPS = [
   {k:"overview", ic:"🗂️", en:"Overview", th:"ภาพรวม"},
   {k:"phd", ic:"🎓", en:"PhD", th:"ปริญญาเอก"},
-  {k:"lecturer", ic:"🍎", en:"Lecturer", th:"อาจารย์"},
+  {k:"bssc", ic:"🍎", en:"BSSC Lecturer", th:"อาจารย์ BSSC"},
+  {k:"personal", ic:"🌱", en:"Personal", th:"ส่วนตัว"},
 ];
 // ---- One-time import from Outlook archives (michael/vivi/researchlog) ----
 const IMPORT_ACTIVITIES = [
@@ -676,6 +684,12 @@ function applyMigrations(d) {
     if (!contacts.some(c => /Junpeng Lyu/i.test(c.name || ""))) contacts = [...contacts, { _a: [], name: "Junpeng Lyu", role: "Third supervisor", org: "UCL Bartlett (BSSC)", category: "Supervisor", relevance: "Third PhD supervisor", first: "", last: "", follow: "Yes", next: "Introduce / book meeting", notes: "https://profiles.ucl.ac.uk/79102-junpeng-lyu" }];
     d = { ...d, contacts, supervisorTeam: d.supervisorTeam || SUP_TEAM_SEED, meta: { ...(d.meta || {}), supTeamV1: true } };
   }
+  // rename hats: PGTA → BSSC PGTA, Lecturer/Teaching → BSSC Lecturer (Chula Lecturer is new; existing data had no Chula tag)
+  if (!(d.meta || {}).rolesV2) {
+    const map = { "PGTA": "BSSC PGTA", "Lecturer": "BSSC Lecturer", "Teaching": "BSSC Lecturer" };
+    const remap = arr => (arr || []).map(r => (r && map[r.role]) ? { ...r, role: map[r.role] } : r);
+    d = { ...d, activity: remap(d.activity), tasks: remap(d.tasks), sources: remap(d.sources), outputs: remap(d.outputs), ideas: remap(d.ideas), reflections: remap(d.reflections), meta: { ...(d.meta || {}), rolesV2: true } };
+  }
   // one-time recovery: re-add any accidentally-deleted IMPORTED supervision meetings (matched by stable _id)
   if (!(d.meta || {}).recoverMeetingsV1) {
     const haveA = new Set((d.activity || []).map(r => r._id).filter(Boolean));
@@ -816,16 +830,17 @@ function App() {
 
   const months = (() => { const s = new Date(2023, 8, 25), n = new Date(); let mo = (n.getFullYear() - s.getFullYear()) * 12 + (n.getMonth() - s.getMonth()); if (n.getDate() < s.getDate()) mo--; return { y: Math.floor(mo / 12), m: mo % 12 }; })();
   const elapsed = lang === "th" ? `${months.y} ปี ${months.m} เดือน` : `${months.y}y ${months.m}m in`;
+  const HEADER_ROLES = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA"];
+  const roleCount = r => { const x = m.roleAgg.find(a => a.role === r); return x ? x.count : 0; };
+  const goAdd = () => { setGroup("overview"); setTab("add"); };
 
   return (
     <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: INK, background: OFF, minHeight: "100vh" }}>
       <div style={{ background: AUB, color: "#fff", padding: "16px 20px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 800 }}>🎓 {lang === "th" ? "แดชบอร์ดความก้าวหน้าปริญญาเอก" : "PhD Progress Dashboard"}</div>
-            <div style={{ fontSize: 12, color: "#D9CCE6", marginTop: 2 }}>{L("started")} · {elapsed} · {L("domain")}</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>🎓 Pundharee Dashboard</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={goAdd} title={lang === "th" ? "ไปหน้าเพิ่มข้อมูล" : "go to the Add page"} style={{ background: "#fff", color: AUB, border: "none", borderRadius: 8, padding: "7px 15px", cursor: "pointer", fontSize: 13, fontWeight: 800 }}>＋ {lang === "th" ? "เพิ่ม" : "Add"}</button>
             <div style={{ display: "flex", border: "1px solid #6B4E8C", borderRadius: 7, overflow: "hidden" }}>
               {["en","th"].map(lg => (
                 <button key={lg} onClick={() => setLang(lg)} style={{ border: "none", cursor: "pointer", padding: "5px 11px", fontSize: 12, fontWeight: 700, color: lang === lg ? AUB : "#fff", background: lang === lg ? "#fff" : "transparent" }}>{lg.toUpperCase()}</button>
@@ -833,7 +848,7 @@ function App() {
             </div>
             <div style={{ fontSize: 11, color: "#D9CCE6", textAlign: "right" }}>
               {savedAt ? `${L("saved")} ${savedAt.toLocaleTimeString()}` : (loaded ? L("savedAuto") : L("loading"))}
-              <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginTop: 3 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginTop: 3, flexWrap: "wrap" }}>
                 <button onClick={undo} disabled={undoN === 0} title={lang === "th" ? "ย้อนการลบ/รีเซ็ต/แทนที่ครั้งล่าสุด" : "undo the last delete / reset / replace"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: undoN ? "rgba(255,255,255,0.14)" : "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: undoN ? "pointer" : "default", fontSize: 10, opacity: undoN ? 1 : 0.45 }}>⤺ {lang === "th" ? "ย้อนกลับ" : "Undo"}{undoN ? ` (${undoN})` : ""}</button>
                 <button onClick={() => setShowTrash(true)} title={lang === "th" ? "ถังขยะ — ดู/กู้คืนรายการที่ลบ" : "Trash — view / restore deleted items"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: (data.trash || []).length ? "rgba(255,255,255,0.14)" : "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>🗑 {lang === "th" ? "ถังขยะ" : "Trash"}{(data.trash || []).length ? ` (${data.trash.length})` : ""}</button>
                 <button onClick={downloadBackup} title={lang === "th" ? "ดาวน์โหลดสำเนาข้อมูลทั้งหมด (JSON)" : "download a full JSON backup of all your data"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>⤓ {lang === "th" ? "สำรอง" : "Backup"}</button>
@@ -844,6 +859,15 @@ function App() {
               {m.unverified > 0 && <div style={{ color: "#FFB4B4", marginTop: 2 }}>● {m.unverified} {L("toVerify")}</div>}
             </div>
           </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          {HEADER_ROLES.map(r => (
+            <div key={r} style={{ background: "rgba(255,255,255,0.10)", borderLeft: `3px solid ${roleColor(r)}`, borderRadius: 6, padding: "6px 12px", minWidth: 118 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{roleLab(lang, r)}</div>
+              <div style={{ fontSize: 9.5, color: "#D9CCE6", marginTop: 1 }}>{rolePeriod(r) || "—"}</div>
+              <div style={{ fontSize: 19, fontWeight: 800, color: "#fff", lineHeight: 1.15, marginTop: 2 }}>{roleCount(r)} <span style={{ fontSize: 9, fontWeight: 400, color: "#D9CCE6" }}>{lang === "th" ? "กิจกรรม" : "logged"}</span></div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -878,6 +902,7 @@ function App() {
           : tab === "add" ? <AddHub data={data} setData={setData} quickAdd={quickAdd} pushUndo={pushUndo} lang={lang} />
           : tab === "reports" ? <ReportsHub data={data} lang={lang} />
           : tab === "activity" ? <ActivityLog data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} setRow={setRow} addRowWith={addRowWith} setData={setData} lang={lang} />
+          : tab === "personal" ? <PersonalTab data={data} setTab={setTab} lang={lang} />
           : <TableTab tabKey={tab} data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
       </div>
 
@@ -923,6 +948,40 @@ function TrashModal({ data, restoreTrash, restoreAllTrash, emptyTrash, close, la
   );
 }
 
+function PersonalTab({ data, setTab, lang }) {
+  const T = (th, en) => lang === "th" ? th : en;
+  const acts = (data.activity || []).filter(r => roleOf(r) === "Personal");
+  const tasks = (data.tasks || []).filter(r => (r.role || "") === "Personal");
+  const refl = (data.reflections || []).filter(r => (r.role || "") === "Personal");
+  const ideas = (data.ideas || []).filter(r => (r.role || "") === "Personal");
+  const recent = acts.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.date || "")).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>🌱 {T("ส่วนตัว", "Personal")}</div>
+        <div style={{ fontSize: 12, color: GREY, marginTop: 2 }}>{T("รวมทุกอย่างที่ติดแท็กหมวก Personal — เพิ่มได้จากปุ่ม ＋ เพิ่ม (เลือกหมวก Personal)", "Everything tagged with the Personal hat. Add items via ＋ Add (pick the Personal hat).")}</div>
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <Kpi label={T("กิจกรรม", "Activities")} value={acts.length} />
+        <Kpi label={T("งาน", "Tasks")} value={tasks.length} />
+        <Kpi label={T("บันทึกสะท้อน", "Reflections")} value={refl.length} />
+        <Kpi label={T("ไอเดีย", "Ideas")} value={ideas.length} />
+      </div>
+      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>{T("กิจกรรมส่วนตัวล่าสุด", "Recent personal activity")}</div>
+        {recent.length ? recent.map((r, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, padding: "5px 0", borderTop: i ? `1px solid ${BORDER}` : "none" }}>
+            <span style={{ width: 82, color: GREY, flex: "0 0 auto" }}>{r.date}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>{r.activity || "—"}</span>
+            <span style={{ fontSize: 10, color: AUB2, flex: "0 0 auto" }}>{r.category}</span>
+          </div>
+        )) : <div style={{ fontSize: 12, color: GREY }}>{T("ยังไม่มีรายการส่วนตัว — ไปที่ ＋ เพิ่ม แล้วเลือกหมวก Personal", "No personal items yet — go to ＋ Add and pick the Personal hat.")}</div>}
+      </div>
+      <button onClick={() => setTab("add")} style={{ alignSelf: "flex-start", background: AUB, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>＋ {T("เพิ่มรายการส่วนตัว", "Add personal item")}</button>
+    </div>
+  );
+}
+
 function Kpi({ label, value, sub }) {
   return (
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 14px", minWidth: 130, flex: "1 1 130px" }}>
@@ -937,7 +996,7 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   const L = k => t(lang, k);
   const phaseName = p => lang === "th" ? (PHASE_TH[p] || p) : p;
   const totalAct = m.roleAgg.reduce((a, r) => a + r.count, 0) || 1;
-  const RORDER = ["PhD", "Lecturer", "Service/Admin", "Personal", "PGTA"];
+  const RORDER = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal"];
   const activeRoles = m.roleAgg.filter(r => r.count > 0).slice().sort((a, b) => RORDER.indexOf(a.role) - RORDER.indexOf(b.role));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1972,7 +2031,7 @@ async function fetchOutlookEvents(endpoint) {
 function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   const [role, setRole] = useState("PhD");
   const today = new Date().toISOString().slice(0, 10);
-  const HATS = ["PhD", "PGTA", "Lecturer", "Service/Admin"];
+  const HATS = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal"];
   const items = [
     { k: "task", e: "✅", c: "#5D7079", en: "Add Task", th: "เพิ่มงาน", d: lang === "th" ? "สิ่งที่ต้องทำ + สถานะ + กำหนดส่ง" : "to-do with status & deadline", go: () => quickAdd("tasks", { status: "Not started", role, category: "", due: "", title: "" }) },
     { k: "meeting", e: "🤝", c: "#ED6C02", en: "Add Meeting", th: "เพิ่มการประชุม", d: lang === "th" ? "บันทึกการประชุม (→ บันทึกกิจกรรม)" : "log a meeting (→ Activity Log)", go: () => quickAdd("activity", { category: "Meeting", role, date: today, acttype: "Supervision meeting" }) },
@@ -2107,7 +2166,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
         <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: AUB2 }}>{lang === "th" ? "แยกหมวกอัตโนมัติ (คำในหัวข้อ → หมวก)" : "Auto-assign hat (title keyword → hat)"}</span>
-            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "Lecturer" }, { match: "phd, estate, readiness, mycampus, interview, huddle, board, catch, governance", hat: "PhD" }] })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
+            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "BSSC PGTA" }, { match: "phd, estate, readiness, mycampus, interview, huddle, board, catch, governance", hat: "PhD" }] })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
           </div>
           {(outlookCfg.rules || []).length === 0 && <div style={{ fontSize: 10.5, color: GREY }}>{lang === "th" ? "ไม่มีกฎ = ใช้หมวกเดียว (หมวกที่เลือกด้านบน) กับทุกรายการ" : "No rules = one hat (the one selected above) for everything."}</div>}
           {(outlookCfg.rules || []).map((r, i) => (
