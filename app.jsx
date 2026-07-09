@@ -676,6 +676,14 @@ function applyMigrations(d) {
     if (!contacts.some(c => /Junpeng Lyu/i.test(c.name || ""))) contacts = [...contacts, { _a: [], name: "Junpeng Lyu", role: "Third supervisor", org: "UCL Bartlett (BSSC)", category: "Supervisor", relevance: "Third PhD supervisor", first: "", last: "", follow: "Yes", next: "Introduce / book meeting", notes: "https://profiles.ucl.ac.uk/79102-junpeng-lyu" }];
     d = { ...d, contacts, supervisorTeam: d.supervisorTeam || SUP_TEAM_SEED, meta: { ...(d.meta || {}), supTeamV1: true } };
   }
+  // one-time recovery: re-add any accidentally-deleted IMPORTED supervision meetings (matched by stable _id)
+  if (!(d.meta || {}).recoverMeetingsV1) {
+    const haveA = new Set((d.activity || []).map(r => r._id).filter(Boolean));
+    const addA = IMPORT_ACTIVITIES.filter(r => r.category === "Meeting" && !haveA.has(r._id));
+    const haveS = new Set((d.supervisor || []).map(r => r._id).filter(Boolean));
+    const addS = IMPORT_SUPERVISION.filter(r => !haveS.has(r._id));
+    d = { ...d, activity: [...(d.activity || []), ...addA], supervisor: [...(d.supervisor || []), ...addS], meta: { ...(d.meta || {}), recoverMeetingsV1: true } };
+  }
   return d;
 }
 
@@ -698,6 +706,7 @@ function App() {
   useEffect(() => { dataRef.current = data; }, [data]);
   const undoStack = React.useRef([]);
   const [undoN, setUndoN] = useState(0);
+  const [showTrash, setShowTrash] = useState(false);
   const pushUndo = () => { try { undoStack.current.push(JSON.stringify(dataRef.current)); if (undoStack.current.length > 30) undoStack.current.shift(); setUndoN(undoStack.current.length); } catch (e) {} };
   const undo = () => { const prev = undoStack.current.pop(); if (prev != null) { try { setData(JSON.parse(prev)); } catch (e) {} } setUndoN(undoStack.current.length); };
 
@@ -763,7 +772,11 @@ function App() {
     if (r._a && r._a.includes(key)) r._a = r._a.filter(k => k !== key); rows[idx] = r; return { ...d, [tabKey]: rows };
   });
   const addRow = tabKey => setData(d => { const b = { _a: [] }; cols[tabKey].forEach(c => b[c.k] = c.type === "number" ? 0 : ""); return { ...d, [tabKey]: [...d[tabKey], b] }; });
-  const delRow = (tabKey, idx) => { pushUndo(); setData(d => ({ ...d, [tabKey]: d[tabKey].filter((_, i) => i !== idx) })); };
+  const delRow = (tabKey, idx) => { pushUndo(); setData(d => { const row = d[tabKey][idx]; const item = { _tid: Math.random().toString(36).slice(2, 10), store: tabKey, ts: Date.now(), row }; return { ...d, [tabKey]: d[tabKey].filter((_, i) => i !== idx), trash: [...(d.trash || []), item] }; }); };
+  // ---- Trash: soft-deleted rows live in data.trash until restored or emptied ----
+  const restoreTrash = tid => setData(d => { const it = (d.trash || []).find(t => t._tid === tid); if (!it) return d; return { ...d, [it.store]: [...(d[it.store] || []), it.row], trash: (d.trash || []).filter(t => t._tid !== tid) }; });
+  const restoreAllTrash = () => setData(d => { const nd = { ...d }; (d.trash || []).forEach(it => { nd[it.store] = [...(nd[it.store] || []), it.row]; }); nd.trash = []; return nd; });
+  const emptyTrash = () => { if (window.confirm(lang === "th" ? "ล้างถังขยะถาวร? รายการในถังจะหายและกู้คืนไม่ได้อีก" : "Empty trash permanently? Items in the bin will be gone for good.")) { pushUndo(); setData(d => ({ ...d, trash: [] })); } };
   const setRow = (tabKey, idx, nr) => setData(d => { const rows = d[tabKey].slice(); rows[idx] = nr; return { ...d, [tabKey]: rows }; });
   const addRowWith = (tabKey, obj) => setData(d => ({ ...d, [tabKey]: [...d[tabKey], { _a: [], ...obj }] }));
   const quickAdd = (store, preset) => { setData(d => ({ ...d, [store]: [...(d[store] || []), { _a: [], ...preset }] })); setTab(store); };
@@ -822,6 +835,7 @@ function App() {
               {savedAt ? `${L("saved")} ${savedAt.toLocaleTimeString()}` : (loaded ? L("savedAuto") : L("loading"))}
               <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginTop: 3 }}>
                 <button onClick={undo} disabled={undoN === 0} title={lang === "th" ? "ย้อนการลบ/รีเซ็ต/แทนที่ครั้งล่าสุด" : "undo the last delete / reset / replace"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: undoN ? "rgba(255,255,255,0.14)" : "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: undoN ? "pointer" : "default", fontSize: 10, opacity: undoN ? 1 : 0.45 }}>⤺ {lang === "th" ? "ย้อนกลับ" : "Undo"}{undoN ? ` (${undoN})` : ""}</button>
+                <button onClick={() => setShowTrash(true)} title={lang === "th" ? "ถังขยะ — ดู/กู้คืนรายการที่ลบ" : "Trash — view / restore deleted items"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: (data.trash || []).length ? "rgba(255,255,255,0.14)" : "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>🗑 {lang === "th" ? "ถังขยะ" : "Trash"}{(data.trash || []).length ? ` (${data.trash.length})` : ""}</button>
                 <button onClick={downloadBackup} title={lang === "th" ? "ดาวน์โหลดสำเนาข้อมูลทั้งหมด (JSON)" : "download a full JSON backup of all your data"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>⤓ {lang === "th" ? "สำรอง" : "Backup"}</button>
                 <button onClick={reloadFromCloud} title={lang === "th" ? "ดึงข้อมูลล่าสุดจากอุปกรณ์อื่น" : "pull latest from other devices"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>⟳ {lang === "th" ? "ซิงค์" : "Sync"}</button>
                 <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#D9CCE6", cursor: "pointer" }}><input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} />{lang === "th" ? "ไลฟ์" : "Live"}</label>
@@ -865,6 +879,45 @@ function App() {
           : tab === "reports" ? <ReportsHub data={data} lang={lang} />
           : tab === "activity" ? <ActivityLog data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} setRow={setRow} addRowWith={addRowWith} setData={setData} lang={lang} />
           : <TableTab tabKey={tab} data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
+      </div>
+
+      {showTrash && <TrashModal data={data} restoreTrash={restoreTrash} restoreAllTrash={restoreAllTrash} emptyTrash={emptyTrash} close={() => setShowTrash(false)} lang={lang} />}
+    </div>
+  );
+}
+
+// ---- Trash bin: view / restore / empty soft-deleted rows ----
+const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence" };
+function trashLabel(row) {
+  if (!row || typeof row !== "object") return "(item)";
+  const v = row.activity || row.name || row.title || row.task || row.event || row.paper || row.agenda || row.idea || row.reflection || (row.first ? `${row.first} ${row.last || ""}`.trim() : "") || "";
+  return v || "(item)";
+}
+function TrashModal({ data, restoreTrash, restoreAllTrash, emptyTrash, close, lang }) {
+  const items = (data.trash || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  const fmt = ts => { try { return new Date(ts).toLocaleString(lang === "th" ? "th-TH" : "en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+  return (
+    <div onClick={close} style={{ position: "fixed", inset: 0, background: "rgba(20,12,30,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 60 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 560, maxWidth: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}>
+        <div style={{ background: AUB, color: "#fff", padding: "12px 16px", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>🗑 {lang === "th" ? "ถังขยะ" : "Trash"} · {items.length}</span>
+          <button onClick={close} style={{ border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontSize: 18 }}>×</button>
+        </div>
+        <div style={{ padding: 14, overflowY: "auto", flex: 1 }}>
+          {items.length === 0 ? <div style={{ fontSize: 13, color: GREY, textAlign: "center", padding: "30px 0" }}>{lang === "th" ? "ถังขยะว่าง — รายการที่ลบจะมาอยู่ที่นี่ กู้คืนได้" : "Trash is empty — deleted items land here and can be restored."}</div> :
+            items.map(it => (
+              <div key={it._tid} style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 6px", borderBottom: `1px solid ${BORDER}`, fontSize: 12 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: AUB2, borderRadius: 4, padding: "2px 6px", flex: "0 0 auto" }}>{TRASH_STORE_LABELS[it.store] || it.store}</span>
+                <span style={{ flex: 1, minWidth: 0, color: INK, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{trashLabel(it.row)}</span>
+                <span style={{ fontSize: 10, color: GREY, flex: "0 0 auto" }}>{fmt(it.ts)}</span>
+                <button onClick={() => restoreTrash(it._tid)} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 11, fontWeight: 700, flex: "0 0 auto" }}>{lang === "th" ? "กู้คืน" : "Restore"}</button>
+              </div>
+            ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: `1px solid ${BORDER}` }}>
+          <button onClick={restoreAllTrash} disabled={!items.length} style={{ background: items.length ? AUB : "#B9A9CC", color: "#fff", border: "none", borderRadius: 6, padding: "8px 14px", cursor: items.length ? "pointer" : "default", fontSize: 12, fontWeight: 700 }}>{lang === "th" ? "กู้คืนทั้งหมด" : "Restore all"}</button>
+          <button onClick={emptyTrash} disabled={!items.length} style={{ marginLeft: "auto", background: "#fff", color: RED, border: `1px solid ${items.length ? RED : BORDER}`, borderRadius: 6, padding: "8px 14px", cursor: items.length ? "pointer" : "default", fontSize: 12 }}>{lang === "th" ? "ล้างถังขยะ" : "Empty trash"}</button>
+        </div>
       </div>
     </div>
   );
