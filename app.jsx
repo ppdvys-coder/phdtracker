@@ -693,6 +693,14 @@ function App() {
   const lastContent = React.useRef("");
   const contentOf = d => { try { return JSON.stringify({ ...d, meta: { ...(d.meta || {}), savedAt: 0, device: 0 } }); } catch (e) { return Math.random() + ""; } };
 
+  // ---- Undo: snapshot before destructive actions (delete / reset / restore), restore on demand ----
+  const dataRef = React.useRef(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
+  const undoStack = React.useRef([]);
+  const [undoN, setUndoN] = useState(0);
+  const pushUndo = () => { try { undoStack.current.push(JSON.stringify(dataRef.current)); if (undoStack.current.length > 30) undoStack.current.shift(); setUndoN(undoStack.current.length); } catch (e) {} };
+  const undo = () => { const prev = undoStack.current.pop(); if (prev != null) { try { setData(JSON.parse(prev)); } catch (e) {} } setUndoN(undoStack.current.length); };
+
   const lang = (data.meta && data.meta.lang) || "en";
   const L = k => t(lang, k);
 
@@ -727,12 +735,35 @@ function App() {
     return () => clearInterval(id);
   }, [live, loaded]);
 
+  // Outlook auto-sync: once per app open, if enabled in meta.outlook + a Worker endpoint is set
+  const outlookSynced = React.useRef(false);
+  useEffect(() => {
+    if (!loaded || outlookSynced.current) return;
+    const cfg = (data.meta && data.meta.outlook) || {};
+    const endpoint = (typeof window !== "undefined" && window.OUTLOOK_ENDPOINT) || "";
+    if (!cfg.auto || !endpoint) return;
+    outlookSynced.current = true;
+    (async () => {
+      try {
+        const events = await fetchOutlookEvents(endpoint);
+        if (!events.length) return;
+        setData(d => {
+          const res = mergeOutlook(d.activity, events, (d.meta && d.meta.outlook) || {});
+          if (!res.added) return d;
+          setSyncMsg((lang === "th" ? "ดึงจาก Outlook: เพิ่ม " : "Outlook: added ") + res.added);
+          setTimeout(() => setSyncMsg(""), 3500);
+          return { ...d, activity: [...(d.activity || []), ...res.addRows] };
+        });
+      } catch (e) {}
+    })();
+  }, [loaded]);
+
   const update = (tabKey, idx, key, val) => setData(d => {
     const rows = d[tabKey].slice(); const r = { ...rows[idx] }; r[key] = val;
     if (r._a && r._a.includes(key)) r._a = r._a.filter(k => k !== key); rows[idx] = r; return { ...d, [tabKey]: rows };
   });
   const addRow = tabKey => setData(d => { const b = { _a: [] }; cols[tabKey].forEach(c => b[c.k] = c.type === "number" ? 0 : ""); return { ...d, [tabKey]: [...d[tabKey], b] }; });
-  const delRow = (tabKey, idx) => setData(d => ({ ...d, [tabKey]: d[tabKey].filter((_, i) => i !== idx) }));
+  const delRow = (tabKey, idx) => { pushUndo(); setData(d => ({ ...d, [tabKey]: d[tabKey].filter((_, i) => i !== idx) })); };
   const setRow = (tabKey, idx, nr) => setData(d => { const rows = d[tabKey].slice(); rows[idx] = nr; return { ...d, [tabKey]: rows }; });
   const addRowWith = (tabKey, obj) => setData(d => ({ ...d, [tabKey]: [...d[tabKey], { _a: [], ...obj }] }));
   const quickAdd = (store, preset) => { setData(d => ({ ...d, [store]: [...(d[store] || []), { _a: [], ...preset }] })); setTab(store); };
@@ -744,7 +775,7 @@ function App() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const a = document.createElement("a"); a.href = url; a.download = `${tabKey}.csv`; a.click(); URL.revokeObjectURL(url);
   };
-  const resetAll = () => { if (window.confirm("Reset every tab to the original seed data? Your edits will be lost.")) setData(seed()); };
+  const resetAll = () => { if (window.confirm("Reset every tab to the original seed data? Your edits will be lost.")) { pushUndo(); setData(seed()); } };
   const downloadBackup = () => { const today = new Date().toISOString().slice(0, 10); const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = `phd_dashboard_backup_${today}.json`; a.click(); URL.revokeObjectURL(url); };
 
   const m = useMemo(() => {
@@ -790,6 +821,7 @@ function App() {
             <div style={{ fontSize: 11, color: "#D9CCE6", textAlign: "right" }}>
               {savedAt ? `${L("saved")} ${savedAt.toLocaleTimeString()}` : (loaded ? L("savedAuto") : L("loading"))}
               <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginTop: 3 }}>
+                <button onClick={undo} disabled={undoN === 0} title={lang === "th" ? "ย้อนการลบ/รีเซ็ต/แทนที่ครั้งล่าสุด" : "undo the last delete / reset / replace"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: undoN ? "rgba(255,255,255,0.14)" : "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: undoN ? "pointer" : "default", fontSize: 10, opacity: undoN ? 1 : 0.45 }}>⤺ {lang === "th" ? "ย้อนกลับ" : "Undo"}{undoN ? ` (${undoN})` : ""}</button>
                 <button onClick={downloadBackup} title={lang === "th" ? "ดาวน์โหลดสำเนาข้อมูลทั้งหมด (JSON)" : "download a full JSON backup of all your data"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>⤓ {lang === "th" ? "สำรอง" : "Backup"}</button>
                 <button onClick={reloadFromCloud} title={lang === "th" ? "ดึงข้อมูลล่าสุดจากอุปกรณ์อื่น" : "pull latest from other devices"} style={{ border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>⟳ {lang === "th" ? "ซิงค์" : "Sync"}</button>
                 <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#D9CCE6", cursor: "pointer" }}><input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} />{lang === "th" ? "ไลฟ์" : "Live"}</label>
@@ -829,7 +861,7 @@ function App() {
           : tab === "lecexport" ? <LecturerExport data={data} lang={lang} />
           : tab === "events" ? <EventsTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
           : tab === "supervisor" ? <SupervisorTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
-          : tab === "add" ? <AddHub data={data} setData={setData} quickAdd={quickAdd} lang={lang} />
+          : tab === "add" ? <AddHub data={data} setData={setData} quickAdd={quickAdd} pushUndo={pushUndo} lang={lang} />
           : tab === "reports" ? <ReportsHub data={data} lang={lang} />
           : tab === "activity" ? <ActivityLog data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} setRow={setRow} addRowWith={addRowWith} setData={setData} lang={lang} />
           : <TableTab tabKey={tab} data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
@@ -927,8 +959,19 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   );
 }
 
-function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang }) {
+function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortKey, sortDir }) {
   const cs = cols[tabKey]; const rows = data[tabKey]; const L = k => t(lang, k);
+  // optional display sort — keeps each row's real index (i) so edit/delete still target the right row
+  let view = rows.map((r, i) => ({ r, i }));
+  if (sortKey) {
+    const dir = sortDir === "desc" ? -1 : 1;
+    view = view.slice().sort((a, b) => {
+      const av = a.r[sortKey] || "", bv = b.r[sortKey] || "";
+      if (!av && !bv) return 0;
+      if (!av) return 1; if (!bv) return -1;           // blank dates always sink to the bottom
+      return (av < bv ? -1 : av > bv ? 1 : 0) * dir;
+    });
+  }
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
@@ -943,8 +986,8 @@ function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang }) {
             <th style={{ background: AUB, width: 34 }} />
           </tr></thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} style={{ background: i % 2 ? OFF : "#fff" }}>
+            {view.map(({ r, i }, ri) => (
+              <tr key={i} style={{ background: ri % 2 ? OFF : "#fff" }}>
                 {cs.map(c => {
                   const assumed = r._a && r._a.includes(c.k); const isStatus = ["status", "follow"].includes(c.k);
                   const color = assumed ? RED : (isStatus && STAT_COLOR[r[c.k]] ? STAT_COLOR[r[c.k]] : INK);
@@ -1009,7 +1052,7 @@ function ActivityLog({ data, update, addRow, delRow, exportCSV, setRow, addRowWi
           ))}
         </div>
       )}
-      {view === "list" && <TableTab tabKey="activity" data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
+      {view === "list" && <TableTab tabKey="activity" data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} sortKey="date" sortDir="desc" />}
       {view === "calendar" && <CalendarView indexed={shown} full={full} cal={cal} setCal={setCal} openEdit={openEdit} openNew={openNew} lang={lang} />}
       {view === "folder" && <FolderView indexed={shown} openEdit={openEdit} openNew={openNew} vault={vault} lang={lang} />}
       {editing && <EntryModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} vault={vault} contactNames={contactNames} lang={lang} />}
@@ -1795,8 +1838,85 @@ function TeachingTab({ data, lang }) {
   );
 }
 
+// ---- Outlook calendar (.ics) parsing → Activity rows ----
+function parseICS(text) {
+  const unfolded = String(text || "").replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
+  const lines = unfolded.split(/\r?\n/);
+  const unesc = s => s.replace(/\\n/gi, " ").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\").trim();
+  const icsDate = v => { const m = String(v).match(/(\d{4})(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]}-${m[3]}` : ""; };
+  const out = []; let cur = null;
+  for (const line of lines) {
+    if (line === "BEGIN:VEVENT") { cur = {}; continue; }
+    if (line === "END:VEVENT") { if (cur && cur.date) out.push(cur); cur = null; continue; }
+    if (!cur) continue;
+    const idx = line.indexOf(":"); if (idx < 0) continue;
+    const left = line.slice(0, idx);            // NAME plus any ;PARAMS
+    const name = left.split(";")[0].toUpperCase();
+    const val = line.slice(idx + 1);
+    if (name === "UID") cur.uid = val.trim();
+    else if (name === "SUMMARY") cur.summary = unesc(val);
+    else if (name === "LOCATION") cur.location = unesc(val);
+    else if (name === "DESCRIPTION") cur.description = unesc(val).slice(0, 300);
+    else if (name === "DTSTART") cur.date = icsDate(val);
+    else if (name === "X-MICROSOFT-CDO-BUSYSTATUS") cur.busy = val.trim().toUpperCase();
+    else if (name === "TRANSP" && !cur.busy) cur.busy = /TRANSPARENT/i.test(val) ? "FREE" : "BUSY";
+    else if (name === "ORGANIZER") { const m = left.match(/CN=([^:;]+)/i); cur.organizer = m ? m[1].replace(/^"|"$/g, "").trim() : ""; }
+  }
+  return out.map(e => ({ uid: e.uid || (e.date + "|" + (e.summary || "")), date: e.date, summary: e.summary || "(no title)", location: e.location || "", description: e.description || "", organizer: e.organizer || "", busy: e.busy || "" }));
+}
+function outlookToActivity(ev, role) {
+  return { _id: "ics-" + ev.uid, _a: [], date: ev.date, category: "Meeting", activity: ev.summary, linked: ev.organizer || "", detail: [ev.location, ev.description].filter(Boolean).join(" — "), obsidian: "", output: "", hours: 0, tag: "outlook", role: role || "PhD", acttype: "", evidence: "", reflection: "", impact: "", privacy: "" };
+}
+function filterOutlookEvents(events, filter) {
+  const from = (filter.from || "").trim();
+  const inc = (filter.keyword || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean); // include if title matches ANY
+  const exc = (filter.exclude || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean); // drop if title matches ANY
+  const busyMode = filter.busy || "busy"; // default: only events you're marked Busy/OOF for (i.e. committed)
+  const allowedBusy = busyMode === "all" ? null : busyMode === "tentative" ? ["BUSY", "OOF", "TENTATIVE"] : ["BUSY", "OOF"];
+  return events.filter(e => {
+    if (from && (e.date || "") < from) return false;
+    if (allowedBusy && e.busy && !allowedBusy.includes(e.busy)) return false; // skip Free/declined; keep unknown-status
+    const hay = `${e.summary || ""} ${e.location || ""} ${e.organizer || ""}`.toLowerCase();
+    if (inc.length && !inc.some(t => hay.includes(t))) return false;
+    if (exc.length && exc.some(t => hay.includes(t))) return false;
+    return true;
+  });
+}
+// pick a hat for an event from the keyword→hat rules (first match wins); null if none match
+function outlookHatFor(ev, rules) {
+  const hay = `${ev.summary || ""} ${ev.location || ""}`.toLowerCase();
+  for (const r of rules) {
+    const terms = (r.match || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    if (terms.length && terms.some(t => hay.includes(t))) return r.hat || "PhD";
+  }
+  return null;
+}
+// returns the NEW rows to append (already de-duplicated against existing activity by _id)
+function mergeOutlook(activity, events, filter) {
+  const gated = filterOutlookEvents(events, filter);
+  const rules = Array.isArray(filter.rules) ? filter.rules.filter(r => (r.match || "").trim()) : [];
+  const rows = [];
+  gated.forEach(e => {
+    let hat;
+    if (rules.length) { hat = outlookHatFor(e, rules) || filter.fallback || ""; if (!hat) return; } // rule mode: skip unmatched unless a fallback hat is set
+    else hat = filter.role || "PhD"; // single-hat mode
+    const a = outlookToActivity(e, hat);
+    if (a.date) rows.push(a);
+  });
+  const have = new Set((activity || []).map(r => r._id).filter(Boolean));
+  const addRows = rows.filter(a => !have.has(a._id));
+  return { addRows, added: addRows.length, skipped: rows.length - addRows.length };
+}
+async function fetchOutlookEvents(endpoint) {
+  const r = await fetch(endpoint);
+  const text = await r.text();
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  if ((r.headers.get("content-type") || "").includes("json")) { const j = JSON.parse(text); if (j.error) throw new Error(j.error); }
+  return parseICS(text);
+}
+
 // ---- Quick-Add hub (capture once, store structured) ----
-function AddHub({ data, setData, quickAdd, lang }) {
+function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   const [role, setRole] = useState("PhD");
   const today = new Date().toISOString().slice(0, 10);
   const HATS = ["PhD", "PGTA", "Lecturer", "Service/Admin"];
@@ -1811,7 +1931,7 @@ function AddHub({ data, setData, quickAdd, lang }) {
     { k: "idea", e: "💡", c: "#2E7D32", en: "Add Idea", th: "เพิ่มไอเดีย", d: lang === "th" ? "จับความคิดไว้ก่อน" : "capture a thought", go: () => quickAdd("ideas", { role, date: today, status: "New" }) },
   ];
   const exportAll = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = `phd_dashboard_backup_${today}.json`; a.click(); URL.revokeObjectURL(url); };
-  const importAll = e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const p = JSON.parse(r.result); if (p && typeof p === "object" && p.timeline && window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมดด้วยไฟล์นี้? (แนะนำให้สำรองก่อน)" : "Replace ALL current data with this file? (Export a backup first if unsure.)")) setData(p); else if (!p.timeline) window.alert("This doesn't look like a dashboard backup file."); } catch (err) { window.alert(lang === "th" ? "อ่านไฟล์ JSON ไม่ได้" : "Could not read that file as JSON."); } }; r.readAsText(f); e.target.value = ""; };
+  const importAll = e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const p = JSON.parse(r.result); if (p && typeof p === "object" && p.timeline && window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมดด้วยไฟล์นี้? (แนะนำให้สำรองก่อน)" : "Replace ALL current data with this file? (Export a backup first if unsure.)")) { if (pushUndo) pushUndo(); setData(p); } else if (!p.timeline) window.alert("This doesn't look like a dashboard backup file."); } catch (err) { window.alert(lang === "th" ? "อ่านไฟล์ JSON ไม่ได้" : "Could not read that file as JSON."); } }; r.readAsText(f); e.target.value = ""; };
 
   // paste-JSON import: append rows into matching stores, or replace everything with a full backup
   const [pasteText, setPasteText] = useState("");
@@ -1824,6 +1944,7 @@ function AddHub({ data, setData, quickAdd, lang }) {
     if (mode === "replace") {
       if (!parsed.timeline) { setPasteMsg({ ok: false, text: lang === "th" ? "ไม่ใช่ไฟล์สำรองเต็ม (ไม่มี timeline) — ใช้โหมดเพิ่มแทน" : "That isn't a full backup (no timeline) — use Add instead." }); return; }
       if (!window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมด? (สำรองก่อนถ้าไม่แน่ใจ)" : "Replace ALL current data with this? (Back up first if unsure.)")) return;
+      if (pushUndo) pushUndo();
       setData(parsed); setPasteMsg({ ok: true, text: lang === "th" ? "แทนที่ข้อมูลทั้งหมดแล้ว" : "Replaced all data." }); setPasteText(""); return;
     }
     const summary = IMPORT_STORES.filter(k => Array.isArray(parsed[k]) && parsed[k].length).map(k => `${parsed[k].length} ${k}`);
@@ -1831,6 +1952,38 @@ function AddHub({ data, setData, quickAdd, lang }) {
     setData(d => { const nd = { ...d }; IMPORT_STORES.forEach(k => { if (Array.isArray(parsed[k]) && parsed[k].length) { const items = parsed[k].map(it => (it && typeof it === "object" && !Array.isArray(it)) ? { _a: [], ...it } : it); nd[k] = [...(Array.isArray(nd[k]) ? nd[k] : []), ...items]; } }); return nd; });
     setPasteMsg({ ok: true, text: (lang === "th" ? "เพิ่มแล้ว: " : "Added: ") + summary.join(", ") });
     setPasteText("");
+  };
+
+  // Outlook calendar sync (read-only): pull .ics events into the Activity Log, de-duplicated by UID.
+  // Filter + auto-on-open settings live in meta.outlook so the auto-sync (in App) reuses them.
+  const [outMsg, setOutMsg] = useState(null);
+  const [outBusy, setOutBusy] = useState(false);
+  const outlookEndpoint = (typeof window !== "undefined" && window.OUTLOOK_ENDPOINT) || "";
+  const outlookCfg = (data.meta && data.meta.outlook) || {};
+  const setOutlookCfg = patch => setData(d => ({ ...d, meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), ...patch } } }));
+  const mergeCalEvents = events => {
+    const filter = { ...outlookCfg, role };
+    const res = mergeOutlook(data.activity, events, filter);
+    if (res.added) setData(d => ({ ...d, activity: [...(d.activity || []), ...res.addRows], meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), role } } }));
+    else setOutlookCfg({ role });
+    return res;
+  };
+  const reportMerge = res => setOutMsg({ ok: true, text: lang === "th" ? `เพิ่ม ${res.added} กิจกรรม (ข้ามซ้ำ ${res.skipped})` : `Added ${res.added} events (skipped ${res.skipped} already imported)` });
+  const syncOutlook = async () => {
+    if (!outlookEndpoint) { setOutMsg({ ok: false, text: lang === "th" ? "ยังไม่ได้ตั้งค่า Worker — ใส่ Worker URL ใน index.html หรือใช้ ‘อัปโหลด .ics’" : "No Worker URL set — add it in index.html, or use ‘Import .ics file’." }); return; }
+    setOutBusy(true); setOutMsg(null);
+    try {
+      const events = await fetchOutlookEvents(outlookEndpoint);
+      if (!events.length) setOutMsg({ ok: false, text: lang === "th" ? "ไม่พบกิจกรรมในปฏิทิน" : "No events found in the calendar." });
+      else reportMerge(mergeCalEvents(events));
+    } catch (e) { setOutMsg({ ok: false, text: (lang === "th" ? "ซิงค์ไม่สำเร็จ: " : "Sync failed: ") + e.message }); }
+    setOutBusy(false);
+  };
+  const importICSFile = e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { try { const events = parseICS(String(rd.result)); if (!events.length) setOutMsg({ ok: false, text: lang === "th" ? "ไม่พบกิจกรรมในไฟล์" : "No events found in that file." }); else reportMerge(mergeCalEvents(events)); } catch (err) { setOutMsg({ ok: false, text: lang === "th" ? "อ่านไฟล์ .ics ไม่ได้" : "Couldn't read that .ics file." }); } };
+    rd.readAsText(f); e.target.value = "";
   };
 
   return (
@@ -1879,6 +2032,65 @@ function AddHub({ data, setData, quickAdd, lang }) {
           {pasteMsg && <span style={{ fontSize: 12, fontWeight: 600, color: pasteMsg.ok ? GREEN : RED }}>{pasteMsg.ok ? "✓ " : "⚠ "}{pasteMsg.text}</span>}
         </div>
         <div style={{ fontSize: 10.5, color: GREY, marginTop: 8, lineHeight: 1.5 }}>{lang === "th" ? "คีย์ที่รองรับ: " : "Supported keys: "}<span style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>activity, contacts, tasks, events, publications, interviews, timeline, supervisor, sources, outputs, ideas, reflections, teachingSessions, guestLectures, supervision, marking, teachingEvidence</span></div>
+      </div>
+
+      <div style={{ marginTop: 16, background: OFF, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 4 }}>📅 {lang === "th" ? "ซิงค์จากปฏิทิน Outlook" : "Sync from Outlook calendar"}</div>
+        <div style={{ fontSize: 11, color: GREY, marginBottom: 10 }}>{lang === "th" ? "ดึงกิจกรรม/ประชุมจากปฏิทินมาเพิ่มใน Activity Log (อ่านอย่างเดียว, กันซ้ำอัตโนมัติด้วยรหัส UID) · แท็กด้วยหมวกที่เลือกด้านบน" : "Pulls your calendar events into the Activity Log (read-only, de-duplicated by UID). Tagged with the hat selected above; category = Meeting."}</div>
+        <div style={{ background: "#FFF7E6", border: `1px solid ${AMBER}`, borderRadius: 8, padding: "7px 10px", fontSize: 11, color: "#8a5a00", marginBottom: 10 }}>{lang === "th" ? "💡 ปฏิทินมักมีหลายร้อยรายการ — แนะนำใส่ตัวกรองด้านล่างก่อน (เช่น คำว่า “supervision” หรือกำหนดวันเริ่ม) ไม่งั้นจะดึงเข้ามาทั้งหมด" : "💡 Calendars often have hundreds of entries — set a filter below first (e.g. keyword “supervision”, or a start date), otherwise everything gets imported."}</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+          <label style={{ fontSize: 11, color: AUB2, display: "flex", alignItems: "center", gap: 5 }}>{lang === "th" ? "ตั้งแต่วันที่" : "From date"}<input value={outlookCfg.from || ""} onChange={e => setOutlookCfg({ from: e.target.value })} placeholder="YYYY-MM-DD" style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, width: 120 }} /></label>
+          <label style={{ fontSize: 11, color: AUB2, display: "flex", alignItems: "center", gap: 5 }}>{lang === "th" ? "มีคำใดคำหนึ่ง" : "Include any of"}<input value={outlookCfg.keyword || ""} onChange={e => setOutlookCfg({ keyword: e.target.value })} placeholder={lang === "th" ? "estates, phd, dibam" : "estates, phd, dibam"} title={lang === "th" ? "คั่นหลายคำด้วยเครื่องหมาย , (เจอคำใดคำหนึ่งก็เอา) · เว้นว่าง = เอาทุกอัน" : "comma-separated; keeps events matching ANY word · blank = keep all"} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, width: 190 }} /></label>
+          <label style={{ fontSize: 11, color: AUB2, display: "flex", alignItems: "center", gap: 5 }}>{lang === "th" ? "ตัดคำออก" : "Exclude"}<input value={outlookCfg.exclude || ""} onChange={e => setOutlookCfg({ exclude: e.target.value })} placeholder={lang === "th" ? "private, appointment" : "private, appointment"} title={lang === "th" ? "คั่นด้วย , · ตัดรายการที่มีคำเหล่านี้ออก" : "comma-separated; drops events containing ANY of these"} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, width: 160 }} /></label>
+          <label style={{ fontSize: 11, color: AUB2, display: "flex", alignItems: "center", gap: 5 }}>{lang === "th" ? "สถานะ" : "Status"}
+            <select value={outlookCfg.busy || "busy"} onChange={e => setOutlookCfg({ busy: e.target.value })} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>
+              <option value="busy">{lang === "th" ? "เฉพาะที่ไม่ว่าง (Busy) — ไปจริง" : "Busy only (attended)"}</option>
+              <option value="tentative">{lang === "th" ? "Busy + Tentative" : "Busy + Tentative"}</option>
+              <option value="all">{lang === "th" ? "ทั้งหมด (รวม Free)" : "All (incl. Free)"}</option>
+            </select>
+          </label>
+        </div>
+
+        <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: AUB2 }}>{lang === "th" ? "แยกหมวกอัตโนมัติ (คำในหัวข้อ → หมวก)" : "Auto-assign hat (title keyword → hat)"}</span>
+            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "Lecturer" }, { match: "phd, estate, readiness, mycampus, interview, huddle, board, catch, governance", hat: "PhD" }] })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
+          </div>
+          {(outlookCfg.rules || []).length === 0 && <div style={{ fontSize: 10.5, color: GREY }}>{lang === "th" ? "ไม่มีกฎ = ใช้หมวกเดียว (หมวกที่เลือกด้านบน) กับทุกรายการ" : "No rules = one hat (the one selected above) for everything."}</div>}
+          {(outlookCfg.rules || []).map((r, i) => (
+            <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+              <input value={r.match || ""} onChange={e => { const rules = (outlookCfg.rules || []).slice(); rules[i] = { ...rules[i], match: e.target.value }; setOutlookCfg({ rules }); }} placeholder={lang === "th" ? "คำ, คำ, คำ" : "word, word, word"} style={{ flex: "1 1 240px", border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11 }} />
+              <span style={{ color: GREY }}>→</span>
+              <select value={r.hat || "PhD"} onChange={e => { const rules = (outlookCfg.rules || []).slice(); rules[i] = { ...rules[i], hat: e.target.value }; setOutlookCfg({ rules }); }} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>{ROLES.map(h => <option key={h} value={h}>{roleLab(lang, h)}</option>)}</select>
+              <button onClick={() => setOutlookCfg({ rules: (outlookCfg.rules || []).filter((_, x) => x !== i) })} title="delete" style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 15 }}>×</button>
+            </div>
+          ))}
+          {(outlookCfg.rules || []).length > 0 && (
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+              <button onClick={() => setOutlookCfg({ rules: [...(outlookCfg.rules || []), { match: "", hat: "PhD" }] })} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>{lang === "th" ? "＋ เพิ่มกฎ" : "＋ Add rule"}</button>
+              <label style={{ fontSize: 11, color: AUB2, display: "flex", alignItems: "center", gap: 5 }}>{lang === "th" ? "รายการที่ไม่ตรงกฎ →" : "Unmatched →"}
+                <select value={outlookCfg.fallback || ""} onChange={e => setOutlookCfg({ fallback: e.target.value })} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>
+                  <option value="">{lang === "th" ? "ข้าม (ไม่นำเข้า)" : "Skip (don't import)"}</option>
+                  {ROLES.map(h => <option key={h} value={h}>{roleLab(lang, h)}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+        </div>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: AUB, fontWeight: 600, marginBottom: 10, cursor: "pointer" }}>
+          <input type="checkbox" checked={!!outlookCfg.auto} onChange={e => setOutlookCfg({ auto: e.target.checked, role })} />
+          🔄 {lang === "th" ? "ดึงอัตโนมัติทุกครั้งที่เปิดแอป (ใช้ตัวกรอง + กฎที่บันทึกไว้)" : "Auto-sync every time I open the app (uses the saved filter + rules)"}
+        </label>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button onClick={syncOutlook} disabled={outBusy} style={{ background: outBusy ? "#B9A9CC" : AUB, color: "#fff", border: "none", borderRadius: 6, padding: "8px 14px", cursor: outBusy ? "default" : "pointer", fontSize: 12, fontWeight: 700 }}>{outBusy ? (lang === "th" ? "กำลังซิงค์…" : "Syncing…") : (lang === "th" ? "ซิงค์จาก Outlook" : "Sync from Outlook")}</button>
+          <label style={{ background: "#fff", color: AUB2, border: `1px solid ${BORDER}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 12 }}>
+            {lang === "th" ? "อัปโหลดไฟล์ .ics…" : "Import .ics file…"}
+            <input type="file" accept=".ics,text/calendar" onChange={importICSFile} style={{ display: "none" }} />
+          </label>
+          {outMsg && <span style={{ fontSize: 12, fontWeight: 600, color: outMsg.ok ? GREEN : RED }}>{outMsg.ok ? "✓ " : "⚠ "}{outMsg.text}</span>}
+        </div>
+        <div style={{ fontSize: 10.5, color: GREY, marginTop: 8, lineHeight: 1.5 }}>{outlookEndpoint ? (lang === "th" ? "เชื่อม Worker แล้ว ✓" : "Worker connected ✓") : (lang === "th" ? "ยังไม่ได้เชื่อม Worker — “ซิงค์จาก Outlook” จะใช้ได้เมื่อใส่ URL ใน index.html · “อัปโหลด .ics” ใช้ได้เลย" : "Worker not connected yet — “Sync from Outlook” needs the URL in index.html · “Import .ics file” works right now.")}</div>
       </div>
     </div>
   );
@@ -2209,8 +2421,36 @@ function TaskTracker({ data, update, setTab, lang }) {
 // ---- Supervisor tab: team info + meeting log ----
 function SupervisorTab({ data, update, addRow, delRow, exportCSV, lang }) {
   const team = data.supervisorTeam || SUP_TEAM_SEED;
+  // meetings-per-person, counted from the Activity Log (category Meeting, "Linked to (person)")
+  const meetingCounts = (() => {
+    const counts = {};
+    (data.activity || []).forEach(r => {
+      if ((r.category || "") !== "Meeting") return;
+      String(r.linked || "").split(/\s*[;&]\s*/).map(s => s.trim()).filter(Boolean)
+        .forEach(n => { counts[n] = (counts[n] || 0) + 1; });
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  })();
+  const totalMeetings = (data.activity || []).filter(r => (r.category || "") === "Meeting").length;
+  const lastWith = name => { const ds = (data.activity || []).filter(r => (r.category || "") === "Meeting" && String(r.linked || "").split(/\s*[;&]\s*/).map(s => s.trim()).includes(name) && /^\d{4}-\d{2}-\d{2}$/.test(r.date || "")).map(r => r.date).sort(); return ds.length ? ds[ds.length - 1] : ""; };
   return (
     <div>
+      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 2 }}>📊 {lang === "th" ? "สรุปการประชุม — พบใครไปกี่ครั้ง" : "Meeting summary — who you've met, and how often"}</div>
+        <div style={{ fontSize: 11, color: GREY, marginBottom: 10 }}>{lang === "th" ? `รวม ${totalMeetings} ครั้ง · นับจากบันทึกกิจกรรม (หมวด Meeting → ช่อง “Linked to”)` : `${totalMeetings} meetings total · counted from your Activity Log (category = Meeting → "Linked to")`}</div>
+        {meetingCounts.length ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {meetingCounts.map(([name, n]) => { const last = lastWith(name);
+              return (
+                <div key={name} style={{ border: `1px solid ${BORDER}`, borderTop: `3px solid ${AUB2}`, borderRadius: 10, padding: "8px 12px", minWidth: 130, background: OFF }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: AUB }}>{name}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: AUB, lineHeight: 1.1 }}>{n} <span style={{ fontSize: 11, fontWeight: 600, color: GREY }}>{lang === "th" ? "ครั้ง" : (n === 1 ? "meeting" : "meetings")}</span></div>
+                  {last && <div style={{ fontSize: 10, color: GREY, marginTop: 1 }}>{lang === "th" ? "ล่าสุด " : "last "}{last}</div>}
+                </div>
+              ); })}
+          </div>
+        ) : <div style={{ fontSize: 12, color: GREY }}>{lang === "th" ? "ยังไม่มีบันทึกการประชุมที่ระบุบุคคล — เพิ่มการประชุมใน Activity Log แล้วใส่ชื่อในช่อง Linked to" : "No meetings with a named person yet — log a Meeting in the Activity Log and fill in “Linked to”."}</div>}
+      </div>
       <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>🧑‍🏫 {lang === "th" ? "ทีมที่ปรึกษา & ผู้ให้ทุน" : "Supervisory team & funder"}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 10, marginBottom: 18 }}>
         {team.map((p, i) => { const funder = /fund/i.test(p.role);

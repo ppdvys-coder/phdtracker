@@ -65,6 +65,10 @@
   const SUPABASE_ANON_KEY = "sb_publishable_8uBKOxp930FYlQcptv1cow_Ae81PVjZ";        // <-- publishable (public) key
   const TABLE  = "phd_state";
   const DOC_ID = "phd-journey-7c3f9a2e";  // your private row id (change if you want a fresh, separate store)
+
+  // Outlook calendar sync (optional): paste your Cloudflare Worker URL here after deploying outlook-cal-worker.js.
+  // Leave "" to use only the "Import .ics file…" option. The Worker holds your private .ics link (not this page).
+  window.OUTLOOK_ENDPOINT = "https://outlook-cal.ppdvys.workers.dev/";
 </script>
 
 <!-- ============================================================
