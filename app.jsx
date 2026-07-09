@@ -730,6 +730,13 @@ function applyMigrations(d) {
     const addS = IMPORT_SUPERVISION.filter(r => !haveS.has(r._id));
     d = { ...d, activity: [...(d.activity || []), ...addA], supervisor: [...(d.supervisor || []), ...addS], meta: { ...(d.meta || {}), recoverMeetingsV1: true } };
   }
+  // auto-fill the supervision log's "with" (people) field from the imported email history, matched by date
+  if (!(d.meta || {}).supWithV1) {
+    const datePeople = {};
+    IMPORT_ACTIVITIES.forEach(a => { if (a.tag === "supervision" && a.linked && a.date) datePeople[a.date] = a.linked; });
+    const sup = (d.supervisor || []).map(r => (!r.with && r.date && datePeople[r.date]) ? { ...r, with: datePeople[r.date] } : r);
+    d = { ...d, supervisor: sup, meta: { ...(d.meta || {}), supWithV1: true } };
+  }
   return d;
 }
 
@@ -2602,11 +2609,14 @@ function SupervisorTab({ data, update, addRow, delRow, exportCSV, lang }) {
   const splitP = s => String(s || "").split(/\s*[;&,]\s*/).map(x => x.trim()).filter(Boolean);
   const meetingCounts = (() => {
     const counts = {}; ALWAYS_SHOW.forEach(n => { counts[n] = 0; });
-    (data.activity || []).forEach(r => { if ((r.category || "") === "Meeting") splitP(r.linked).forEach(n => { counts[n] = (counts[n] || 0) + 1; }); });
-    (data.supervisor || []).forEach(r => { splitP(r.with).forEach(n => { counts[n] = (counts[n] || 0) + 1; }); });
+    const seen = new Set(); // person|date — dedupe the same meeting appearing in both activity + the log
+    const add = (n, date) => { const k = n + "|" + (date || ""); if (seen.has(k)) return; seen.add(k); counts[n] = (counts[n] || 0) + 1; };
+    (data.activity || []).forEach(r => { if ((r.category || "") === "Meeting") splitP(r.linked).forEach(n => add(n, r.date)); });
+    (data.supervisor || []).forEach(r => splitP(r.with).forEach(n => add(n, r.date)));
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   })();
-  const totalMeetings = (data.activity || []).filter(r => (r.category || "") === "Meeting").length + (data.supervisor || []).filter(r => splitP(r.with).length).length;
+  const actMeetingDates = new Set((data.activity || []).filter(r => (r.category || "") === "Meeting").map(r => r.date).filter(Boolean));
+  const totalMeetings = (data.activity || []).filter(r => (r.category || "") === "Meeting").length + (data.supervisor || []).filter(r => splitP(r.with).length && !actMeetingDates.has(r.date)).length;
   const lastWith = name => { const ds = [...(data.activity || []).filter(r => (r.category || "") === "Meeting" && splitP(r.linked).includes(name)), ...(data.supervisor || []).filter(r => splitP(r.with).includes(name))].map(r => r.date).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d || "")).sort(); return ds.length ? ds[ds.length - 1] : ""; };
   return (
     <div>
