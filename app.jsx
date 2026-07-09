@@ -77,7 +77,7 @@ const COL_I18N = {
   "Abstract / reg. deadline":"กำหนดส่งบทคัดย่อ / ลงทะเบียน","Output produced":"ผลงานที่ได้","Output location / link":"ที่จัดเก็บ / ลิงก์",
   "Cost":"ค่าใช้จ่าย","Funding":"แหล่งทุน","Paper (working title)":"บทความ (ชื่อชั่วคราว)","Series #":"ลำดับชุด",
   "Target journal":"วารสารเป้าหมาย","Co-authors":"ผู้เขียนร่วม","Submission type":"ประเภทการส่ง","Window opens":"เปิดรับ",
-  "Deadline":"กำหนดส่ง","Submitted":"ส่งแล้ว","Decision":"ผลพิจารณา","Meeting type":"ประเภทการประชุม","Met with (people)":"พบกับใคร (แท็กคน)",
+  "Deadline":"กำหนดส่ง","Submitted":"ส่งแล้ว","Decision":"ผลพิจารณา","Meeting type":"ประเภทการประชุม","Met with (people)":"พบกับใคร (แท็กคน)","Project":"โปรเจกต์","Target / end":"เป้าหมาย / สิ้นสุด","Area / type":"ด้าน / ประเภท","Collaborators":"ผู้ร่วมงาน","Start":"เริ่ม",
   "Agenda item / topic":"วาระ / หัวข้อ","Decision / discussion":"ข้อสรุป / การอภิปราย","Action item":"สิ่งที่ต้องทำ","Due":"กำหนด",
   "Activity / record":"กิจกรรม / บันทึก","Linked to (person)":"เชื่อมโยงกับ (บุคคล)","Summary / notes":"สรุป / บันทึก",
   "Obsidian note":"โน้ต Obsidian","Other output / link":"ผลงาน / ลิงก์อื่น","Hours":"ชั่วโมง","Tag":"แท็ก","Role (job)":"บทบาท (งาน)",
@@ -98,7 +98,7 @@ const TSTAT = ["Not started","In progress","Completed","Blocked"];
 const STAT_COLOR = { "Completed":GREEN,"In progress":AMBER,"Not started":GREY,"Blocked":RED,"Attended":GREEN,"Presented":GREEN,
   "Registered":AMBER,"Abstract submitted":AMBER,"Idea":GREY,"Accepted":GREEN,"Under review":AMBER,"Submitted":AMBER,
   "Drafting":GREY,"Outline":GREY,"Planned":GREY,"Revisions":AMBER,"Rejected":RED,"Yes":AMBER,"No":GREY,
-  "Done":GREEN,"Awaiting":AMBER,"New":GREY,"Exploring":AMBER,"Parked":GREY,"Using":GREEN,"Dropped":RED };
+  "Done":GREEN,"Awaiting":AMBER,"New":GREY,"Exploring":AMBER,"Parked":GREY,"Using":GREEN,"Dropped":RED,"Active":GREEN,"On hold":AMBER };
 
 const ACT_CATS = ["Meeting","Interview","Note","Reading","Writing","Data Collection","Analysis","Teaching – prep","Teaching – delivery","Marking","Student support","Training / Event","Paper","Admin","Milestone","Other"];
 const ACT_COLOR = { "Meeting":"#ED6C02","Interview":"#0277BD","Note":"#455A64","Reading":"#6B4E8C","Writing":"#2B1241",
@@ -265,6 +265,12 @@ const cols = {
     {k:"idea",l:"Idea",w:340},{k:"category",l:"Area",w:150},{k:"role",l:"Hat",w:100,type:"select",opts:ROLES},{k:"date",l:"Captured",w:110},
     {k:"status",l:"Status",w:130,type:"select",opts:["New","Exploring","Parked","Using","Dropped"]},{k:"notes",l:"Notes",w:240},
   ],
+  projects: [
+    {k:"title",l:"Project",w:250},{k:"role",l:"Role",w:130,type:"select",opts:ROLES},
+    {k:"status",l:"Status",w:130,type:"select",opts:["Idea","Planned","Active","On hold","Completed","Dropped"]},
+    {k:"start",l:"Start",w:104},{k:"end",l:"Target / end",w:104},{k:"category",l:"Area / type",w:150},
+    {k:"people",l:"Collaborators",w:170},{k:"link",l:"Link / location",w:190},{k:"notes",l:"Notes",w:280},
+  ],
   reflections: [
     {k:"date",l:"Date",w:110},{k:"role",l:"Hat",w:100,type:"select",opts:ROLES},{k:"context",l:"Context / activity",w:200},{k:"reflection",l:"Reflection",w:360},{k:"linked",l:"Linked to",w:150},{k:"privacy",l:"Privacy",w:110,type:"select",opts:PRIVACY},
   ],
@@ -309,6 +315,13 @@ const tk=cols.timeline.map(c=>c.k), ck=cols.contacts.map(c=>c.k), ek=cols.events
 const iv = (code,first,last,date,phase,f,note="") => ({_a:[],code,first,last,date,phase,
   pis:!!f[0],consent:!!f[1],signed:!!f[2],qsent:!!f[3],interviewed:!!f[4],transcribed:!!f[5],note});
 
+const STARTER_PROJECTS = [
+  { _a:[], title:"MyCampus — UCL Estates IWMS transformation", role:"PhD", status:"Active", start:"2024-01", end:"", category:"Fieldwork / applied research", people:"UCL Estates; Adrien Cooper", link:"", notes:"Embedded doctoral research; benefits realisation + readiness case" },
+  { _a:[], title:"Smart Campus Readiness Framework (thesis)", role:"PhD", status:"Active", start:"2023-10", end:"2027", category:"Thesis", people:"Michael Pitt; Vivi (Qiuchen Lu); Junpeng Lyu", link:"", notes:"Core PhD framework" },
+  { _a:[], title:"TU Delft paper series (4 papers)", role:"PhD", status:"Active", start:"2025-07", end:"", category:"Publications", people:"TU Delft; Sanjana", link:"", notes:"See Publications tab" },
+  { _a:[], title:"Urban Digital Twins — KTU Spring School", role:"PhD", status:"Completed", start:"2026-05-11", end:"2026-05-15", category:"Workshop", people:"4 PhD peers", link:"https://fcea.ktu.edu/spring-school-2026/", notes:"Digital-twin platform pitch + demo" },
+  { _a:[], title:"BIDI0002 / BIDI0005 tutorials & marking", role:"BSSC PGTA", status:"Active", start:"2025-01", end:"", category:"Teaching", people:"Michael Pitt; Vivi (Qiuchen Lu); Karim Farghaly", link:"", notes:"PGTA modules" },
+];
 const seed = () => { const S = ({
   meta: { lang:"en", vault:"" },
   timeline: [
@@ -470,6 +483,7 @@ const seed = () => { const S = ({
     { _a:[], idea:"Treat the perception-gap pattern as a standalone finding", category:"Analysis", role:"PhD", date:"", status:"Exploring", notes:"Seniority/seat predicts pillar rankings" },
   ],
   reflections: [],
+  projects: STARTER_PROJECTS.map(p => ({ ...p })),
   teachingSessions: [],
   guestLectures: [
     { _a:[], title:"Digitalising Estates", date:"", ay:"", institution:"UCL Bartlett (BSSC)", programme:"", type:"Guest lecture", role:"Guest lecturer", topic:"Digital transformation of university estates", audience:"BSSC students", nstudents:0, evidence:"", cvwording:"Delivered guest lecture 'Digitalising Estates', The Bartlett School of Sustainable Construction, UCL.", note:"", tags:"guest-lecture", privacy:"Public", usefor:"CV" },
@@ -498,6 +512,7 @@ const TABS = [
   {k:"reflections", group:"overview", ic:"💭", en:"Reflections", th:"บันทึกสะท้อน"},
   {k:"outputs", group:"overview", ic:"📦", en:"Outputs", th:"ผลงาน"},
   {k:"ideas", group:"overview", ic:"💡", en:"Ideas", th:"ไอเดีย"},
+  {k:"projects", group:"overview", ic:"📁", en:"Projects", th:"โปรเจกต์"},
   {k:"contacts", group:"overview", ic:"👥", en:"Contacts", th:"ผู้ติดต่อ"},
   {k:"reports", group:"overview", ic:"📤", en:"Reports", th:"รายงาน"},
   {k:"framing", group:"phd", ic:"🧭", en:"Research Framing", th:"กรอบงานวิจัย"},
@@ -702,6 +717,10 @@ function applyMigrations(d) {
     const map = { "PGTA": "BSSC PGTA", "Lecturer": "BSSC Lecturer", "Teaching": "BSSC Lecturer" };
     const remap = arr => (arr || []).map(r => (r && map[r.role]) ? { ...r, role: map[r.role] } : r);
     d = { ...d, activity: remap(d.activity), tasks: remap(d.tasks), sources: remap(d.sources), outputs: remap(d.outputs), ideas: remap(d.ideas), reflections: remap(d.reflections), meta: { ...(d.meta || {}), rolesV2: true } };
+  }
+  // new Projects store — seed starters for existing users who don't have it yet
+  if (!(d.meta || {}).projectsV1) {
+    d = { ...d, projects: Array.isArray(d.projects) ? d.projects : STARTER_PROJECTS.map(p => ({ ...p })), meta: { ...(d.meta || {}), projectsV1: true } };
   }
   // one-time recovery: re-add any accidentally-deleted IMPORTED supervision meetings (matched by stable _id)
   if (!(d.meta || {}).recoverMeetingsV1) {
@@ -919,6 +938,7 @@ function App() {
           : tab === "personal" ? <RoleSummaryTab data={data} role="Personal" icon="🌱" setTab={setTab} lang={lang} />
           : tab === "chula" ? <RoleSummaryTab data={data} role="Chula Lecturer" icon="🏛️" setTab={setTab} lang={lang} />
           : tab === "pgta" ? <RoleSummaryTab data={data} role="BSSC PGTA" icon="🎒" setTab={setTab} lang={lang} />
+          : tab === "projects" ? <ProjectsTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
           : <TableTab tabKey={tab} data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
       </div>
 
@@ -998,6 +1018,28 @@ function RoleSummaryTab({ data, role, icon, setTab, lang }) {
         )) : <div style={{ fontSize: 12, color: GREY }}>{T("ยังไม่มีรายการ — ไปที่ ＋ เพิ่ม แล้วเลือกหมวกนี้", "Nothing yet — go to ＋ Add and pick this hat.")}</div>}
       </div>
       <button onClick={() => setTab("add")} style={{ alignSelf: "flex-start", background: AUB, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>＋ {T("เพิ่มรายการ", "Add item")}</button>
+    </div>
+  );
+}
+
+function ProjectsTab({ data, update, addRow, delRow, exportCSV, lang }) {
+  const [roleF, setRoleF] = useState("all");
+  const T = (th, en) => lang === "th" ? th : en;
+  const projects = data.projects || [];
+  const countFor = k => k === "all" ? projects.length : projects.filter(p => (p.role || "") === k).length;
+  const shown = roleF === "all" ? projects : projects.filter(p => (p.role || "") === roleF);
+  const byStatus = ["Active", "Planned", "On hold", "Idea", "Completed", "Dropped"].map(s => ({ s, n: shown.filter(p => p.status === s).length })).filter(x => x.n);
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>📁 {T("โปรเจกต์ทั้งหมด", "All projects")}</div>
+      <div style={{ fontSize: 12, color: GREY, marginBottom: 12 }}>{T("รวมโปรเจกต์ทุกหมวกไว้ที่เดียว — แท็กบทบาท (PhD / BSSC Lecturer / Chula Lecturer / Personal …) แล้วกรองดูได้", "Every project in one place — tag a role (PhD / BSSC Lecturer / Chula Lecturer / Personal …) and filter.")}</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        {[["all", T("ทั้งหมด", "All")], ...ROLES.map(r => [r, roleLab(lang, r)])].map(([k, lb]) => (
+          <button key={k} onClick={() => setRoleF(k)} style={{ border: `1px solid ${roleF === k ? AUB : BORDER}`, background: roleF === k ? (k === "all" ? AUB : roleColor(k)) : "#fff", color: roleF === k ? "#fff" : AUB2, borderRadius: 999, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: roleF === k ? 700 : 500 }}>{lb} <span style={{ opacity: 0.7 }}>{countFor(k)}</span></button>
+        ))}
+      </div>
+      {byStatus.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{byStatus.map(({ s, n }) => (<span key={s} style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: STAT_COLOR[s] || GREY, borderRadius: 6, padding: "3px 9px" }}>{s} · {n}</span>))}</div>}
+      <TableTab tabKey="projects" data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} filterRole={roleF} sortKey="start" sortDir="desc" />
     </div>
   );
 }
@@ -1091,10 +1133,11 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   );
 }
 
-function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortKey, sortDir }) {
-  const cs = cols[tabKey]; const rows = data[tabKey]; const L = k => t(lang, k);
-  // optional display sort — keeps each row's real index (i) so edit/delete still target the right row
+function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortKey, sortDir, filterRole }) {
+  const cs = cols[tabKey]; const rows = data[tabKey] || []; const L = k => t(lang, k);
+  // optional display sort/filter — keeps each row's real index (i) so edit/delete still target the right row
   let view = rows.map((r, i) => ({ r, i }));
+  if (filterRole && filterRole !== "all") view = view.filter(o => (o.r.role || "") === filterRole);
   if (sortKey) {
     const dir = sortDir === "desc" ? -1 : 1;
     view = view.slice().sort((a, b) => {
@@ -2061,6 +2104,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
     { k: "reflection", e: "💭", c: "#00796B", en: "Add Reflection", th: "เพิ่มบันทึกสะท้อน", d: lang === "th" ? "โน้ตถึงตัวเองในอนาคต" : "a note to your future self", go: () => quickAdd("reflections", { role, date: today }) },
     { k: "output", e: "📦", c: "#C2185B", en: "Add Output", th: "เพิ่มผลงาน", d: lang === "th" ? "บทความ สไลด์ สื่อการสอน" : "paper, deck, teaching material", go: () => quickAdd("outputs", { role, date: today }) },
     { k: "idea", e: "💡", c: "#2E7D32", en: "Add Idea", th: "เพิ่มไอเดีย", d: lang === "th" ? "จับความคิดไว้ก่อน" : "capture a thought", go: () => quickAdd("ideas", { role, date: today, status: "New" }) },
+    { k: "project", e: "📁", c: "#1565C0", en: "Add Project", th: "เพิ่มโปรเจกต์", d: lang === "th" ? "โปรเจกต์ใหม่ + แท็กหมวก" : "a project + role tag", go: () => quickAdd("projects", { role, status: "Active", start: today }) },
   ];
   const exportAll = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = `phd_dashboard_backup_${today}.json`; a.click(); URL.revokeObjectURL(url); };
   const importAll = e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const p = JSON.parse(r.result); if (p && typeof p === "object" && p.timeline && window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมดด้วยไฟล์นี้? (แนะนำให้สำรองก่อน)" : "Replace ALL current data with this file? (Export a backup first if unsure.)")) { if (pushUndo) pushUndo(); setData(p); } else if (!p.timeline) window.alert("This doesn't look like a dashboard backup file."); } catch (err) { window.alert(lang === "th" ? "อ่านไฟล์ JSON ไม่ได้" : "Could not read that file as JSON."); } }; r.readAsText(f); e.target.value = ""; };
