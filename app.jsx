@@ -77,7 +77,7 @@ const COL_I18N = {
   "Abstract / reg. deadline":"กำหนดส่งบทคัดย่อ / ลงทะเบียน","Output produced":"ผลงานที่ได้","Output location / link":"ที่จัดเก็บ / ลิงก์",
   "Cost":"ค่าใช้จ่าย","Funding":"แหล่งทุน","Paper (working title)":"บทความ (ชื่อชั่วคราว)","Series #":"ลำดับชุด",
   "Target journal":"วารสารเป้าหมาย","Co-authors":"ผู้เขียนร่วม","Submission type":"ประเภทการส่ง","Window opens":"เปิดรับ",
-  "Deadline":"กำหนดส่ง","Submitted":"ส่งแล้ว","Decision":"ผลพิจารณา","Meeting type":"ประเภทการประชุม",
+  "Deadline":"กำหนดส่ง","Submitted":"ส่งแล้ว","Decision":"ผลพิจารณา","Meeting type":"ประเภทการประชุม","Met with (people)":"พบกับใคร (แท็กคน)",
   "Agenda item / topic":"วาระ / หัวข้อ","Decision / discussion":"ข้อสรุป / การอภิปราย","Action item":"สิ่งที่ต้องทำ","Due":"กำหนด",
   "Activity / record":"กิจกรรม / บันทึก","Linked to (person)":"เชื่อมโยงกับ (บุคคล)","Summary / notes":"สรุป / บันทึก",
   "Obsidian note":"โน้ต Obsidian","Other output / link":"ผลงาน / ลิงก์อื่น","Hours":"ชั่วโมง","Tag":"แท็ก","Role (job)":"บทบาท (งาน)",
@@ -121,6 +121,15 @@ const ROLE_META = {
   "Teaching":{th:"งานสอน", c:"#0277BD", period:""},
 };
 const roleStart = r => ROLE_META[r] ? (ROLE_META[r].start || "") : "";
+function elapsedLabel(startStr, lang) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startStr || "")) return "";
+  const s = new Date(startStr), n = new Date();
+  let mo = (n.getFullYear() - s.getFullYear()) * 12 + (n.getMonth() - s.getMonth());
+  if (n.getDate() < s.getDate()) mo--;
+  if (mo < 0) return "";
+  const y = Math.floor(mo / 12), m = mo % 12;
+  return lang === "th" ? `${y} ปี ${m} เดือน` : `${y}y ${m}m`;
+}
 const roleLab = (lang,r) => lang==="th" ? (ROLE_META[r] ? ROLE_META[r].th : r) : r;
 const roleColor = r => ROLE_META[r] ? ROLE_META[r].c : GREY;
 const rolePeriod = r => ROLE_META[r] ? (ROLE_META[r].period || "") : "";
@@ -220,7 +229,7 @@ const cols = {
     {k:"submitted",l:"Submitted",w:100},{k:"decision",l:"Decision",w:100},{k:"notes",l:"Notes",w:200},
   ],
   supervisor: [
-    {k:"date",l:"Date",w:90},{k:"mtype",l:"Meeting type",w:120},{k:"agenda",l:"Agenda item / topic",w:280},
+    {k:"date",l:"Date",w:90},{k:"mtype",l:"Meeting type",w:120},{k:"with",l:"Met with (people)",w:180},{k:"agenda",l:"Agenda item / topic",w:280},
     {k:"decision",l:"Decision / discussion",w:220},{k:"action",l:"Action item",w:220},{k:"owner",l:"Owner",w:80},
     {k:"due",l:"Due",w:90},{k:"status",l:"Status",w:120,type:"select",opts:TSTAT},
   ],
@@ -506,14 +515,18 @@ const TABS = [
   {k:"marking", group:"bssc", ic:"✍️", en:"Assessment & Marking", th:"ตรวจงาน"},
   {k:"teachingEvidence", group:"bssc", ic:"🗂️", en:"Teaching Evidence", th:"หลักฐานการสอน"},
   {k:"lecexport", group:"bssc", ic:"📤", en:"Export Centre", th:"ศูนย์ส่งออก"},
+  {k:"chula", group:"chula", ic:"🏛️", en:"Chula Lecturer", th:"อาจารย์ จุฬาฯ"},
   {k:"personal", group:"personal", ic:"🌱", en:"Personal", th:"ส่วนตัว"},
+  {k:"pgta", group:"pgta", ic:"🎒", en:"PGTA", th:"ผู้ช่วยสอน (PGTA)"},
   {k:"cv", group:"cv", ic:"📋", en:"CV", th:"ประวัติย่อ (CV)"},
 ];
 const GROUPS = [
   {k:"overview", ic:"🗂️", en:"Overview", th:"ภาพรวม"},
   {k:"phd", ic:"🎓", en:"PhD", th:"ปริญญาเอก"},
   {k:"bssc", ic:"🍎", en:"BSSC Lecturer", th:"อาจารย์ BSSC"},
+  {k:"chula", ic:"🏛️", en:"Chula Lecturer", th:"อาจารย์ จุฬาฯ"},
   {k:"personal", ic:"🌱", en:"Personal", th:"ส่วนตัว"},
+  {k:"pgta", ic:"🎒", en:"BSSC PGTA", th:"ผู้ช่วยสอน (PGTA)"},
 ];
 // ---- One-time import from Outlook archives (michael/vivi/researchlog) ----
 const IMPORT_ACTIVITIES = [
@@ -865,6 +878,7 @@ function App() {
             <div key={r} style={{ background: "rgba(255,255,255,0.10)", borderLeft: `3px solid ${roleColor(r)}`, borderRadius: 6, padding: "6px 12px", minWidth: 118 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{roleLab(lang, r)}</div>
               <div style={{ fontSize: 9.5, color: "#D9CCE6", marginTop: 1 }}>{rolePeriod(r) || "—"}</div>
+              {elapsedLabel(roleStart(r), lang) && <div style={{ fontSize: 9.5, color: "#CDBBE0", fontWeight: 600 }}>⏱ {elapsedLabel(roleStart(r), lang)}</div>}
               <div style={{ fontSize: 19, fontWeight: 800, color: "#fff", lineHeight: 1.15, marginTop: 2 }}>{roleCount(r)} <span style={{ fontSize: 9, fontWeight: 400, color: "#D9CCE6" }}>{lang === "th" ? "กิจกรรม" : "logged"}</span></div>
             </div>
           ))}
@@ -902,7 +916,9 @@ function App() {
           : tab === "add" ? <AddHub data={data} setData={setData} quickAdd={quickAdd} pushUndo={pushUndo} lang={lang} />
           : tab === "reports" ? <ReportsHub data={data} lang={lang} />
           : tab === "activity" ? <ActivityLog data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} setRow={setRow} addRowWith={addRowWith} setData={setData} lang={lang} />
-          : tab === "personal" ? <PersonalTab data={data} setTab={setTab} lang={lang} />
+          : tab === "personal" ? <RoleSummaryTab data={data} role="Personal" icon="🌱" setTab={setTab} lang={lang} />
+          : tab === "chula" ? <RoleSummaryTab data={data} role="Chula Lecturer" icon="🏛️" setTab={setTab} lang={lang} />
+          : tab === "pgta" ? <RoleSummaryTab data={data} role="BSSC PGTA" icon="🎒" setTab={setTab} lang={lang} />
           : <TableTab tabKey={tab} data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
       </div>
 
@@ -948,36 +964,40 @@ function TrashModal({ data, restoreTrash, restoreAllTrash, emptyTrash, close, la
   );
 }
 
-function PersonalTab({ data, setTab, lang }) {
+function RoleSummaryTab({ data, role, icon, setTab, lang }) {
   const T = (th, en) => lang === "th" ? th : en;
-  const acts = (data.activity || []).filter(r => roleOf(r) === "Personal");
-  const tasks = (data.tasks || []).filter(r => (r.role || "") === "Personal");
-  const refl = (data.reflections || []).filter(r => (r.role || "") === "Personal");
-  const ideas = (data.ideas || []).filter(r => (r.role || "") === "Personal");
-  const recent = acts.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.date || "")).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
+  const recs = roleRecords(data).filter(x => x.role === role);
+  const tasks = (data.tasks || []).filter(r => (r.role || "") === role);
+  const refl = (data.reflections || []).filter(r => (r.role || "") === role);
+  const ideas = (data.ideas || []).filter(r => (r.role || "") === role);
+  const outputs = (data.outputs || []).filter(r => (r.role || "") === role);
+  const hoursTotal = recs.reduce((a, x) => a + (Number(x.hours) || 0), 0);
+  const recent = recs.filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.date || "")).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 12);
+  const per = rolePeriod(role), el = elapsedLabel(roleStart(role), lang);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>🌱 {T("ส่วนตัว", "Personal")}</div>
-        <div style={{ fontSize: 12, color: GREY, marginTop: 2 }}>{T("รวมทุกอย่างที่ติดแท็กหมวก Personal — เพิ่มได้จากปุ่ม ＋ เพิ่ม (เลือกหมวก Personal)", "Everything tagged with the Personal hat. Add items via ＋ Add (pick the Personal hat).")}</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>{icon} {roleLab(lang, role)}</div>
+        <div style={{ fontSize: 12, color: GREY, marginTop: 2 }}>{per ? `${per}${el ? " · " + el : ""} · ` : ""}{T("รวมทุกอย่างที่ติดแท็กหมวกนี้ — เพิ่มได้จากปุ่ม ＋ เพิ่ม", "Everything tagged with this hat. Add via ＋ Add.")}</div>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <Kpi label={T("กิจกรรม", "Activities")} value={acts.length} />
+        <Kpi label={T("กิจกรรม/บันทึก", "Activities")} value={recs.length} sub={hoursTotal ? `${hoursTotal}${T("ชม.", "h")}` : ""} />
         <Kpi label={T("งาน", "Tasks")} value={tasks.length} />
+        <Kpi label={T("ผลงาน", "Outputs")} value={outputs.length} />
         <Kpi label={T("บันทึกสะท้อน", "Reflections")} value={refl.length} />
         <Kpi label={T("ไอเดีย", "Ideas")} value={ideas.length} />
       </div>
       <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>{T("กิจกรรมส่วนตัวล่าสุด", "Recent personal activity")}</div>
-        {recent.length ? recent.map((r, i) => (
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>{T("กิจกรรมล่าสุด", "Recent activity")}</div>
+        {recent.length ? recent.map((x, i) => (
           <div key={i} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, padding: "5px 0", borderTop: i ? `1px solid ${BORDER}` : "none" }}>
-            <span style={{ width: 82, color: GREY, flex: "0 0 auto" }}>{r.date}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>{r.activity || "—"}</span>
-            <span style={{ fontSize: 10, color: AUB2, flex: "0 0 auto" }}>{r.category}</span>
+            <span style={{ width: 82, color: GREY, flex: "0 0 auto" }}>{x.date}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>{x.activity || "—"}</span>
+            <span style={{ fontSize: 10, color: AUB2, flex: "0 0 auto" }}>{x.category}</span>
           </div>
-        )) : <div style={{ fontSize: 12, color: GREY }}>{T("ยังไม่มีรายการส่วนตัว — ไปที่ ＋ เพิ่ม แล้วเลือกหมวก Personal", "No personal items yet — go to ＋ Add and pick the Personal hat.")}</div>}
+        )) : <div style={{ fontSize: 12, color: GREY }}>{T("ยังไม่มีรายการ — ไปที่ ＋ เพิ่ม แล้วเลือกหมวกนี้", "Nothing yet — go to ＋ Add and pick this hat.")}</div>}
       </div>
-      <button onClick={() => setTab("add")} style={{ alignSelf: "flex-start", background: AUB, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>＋ {T("เพิ่มรายการส่วนตัว", "Add personal item")}</button>
+      <button onClick={() => setTab("add")} style={{ alignSelf: "flex-start", background: AUB, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>＋ {T("เพิ่มรายการ", "Add item")}</button>
     </div>
   );
 }
@@ -2533,18 +2553,17 @@ function TaskTracker({ data, update, setTab, lang }) {
 // ---- Supervisor tab: team info + meeting log ----
 function SupervisorTab({ data, update, addRow, delRow, exportCSV, lang }) {
   const team = data.supervisorTeam || SUP_TEAM_SEED;
-  // meetings-per-person, counted from the Activity Log (category Meeting, "Linked to (person)")
+  // people met, counted from Activity Log meetings (linked) + the supervision log ("with"); supervisors always shown
+  const ALWAYS_SHOW = ["Michael Pitt", "Vivi (Qiuchen Lu)", "Junpeng Lyu", "Adrien Cooper"];
+  const splitP = s => String(s || "").split(/\s*[;&,]\s*/).map(x => x.trim()).filter(Boolean);
   const meetingCounts = (() => {
-    const counts = {};
-    (data.activity || []).forEach(r => {
-      if ((r.category || "") !== "Meeting") return;
-      String(r.linked || "").split(/\s*[;&]\s*/).map(s => s.trim()).filter(Boolean)
-        .forEach(n => { counts[n] = (counts[n] || 0) + 1; });
-    });
+    const counts = {}; ALWAYS_SHOW.forEach(n => { counts[n] = 0; });
+    (data.activity || []).forEach(r => { if ((r.category || "") === "Meeting") splitP(r.linked).forEach(n => { counts[n] = (counts[n] || 0) + 1; }); });
+    (data.supervisor || []).forEach(r => { splitP(r.with).forEach(n => { counts[n] = (counts[n] || 0) + 1; }); });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   })();
-  const totalMeetings = (data.activity || []).filter(r => (r.category || "") === "Meeting").length;
-  const lastWith = name => { const ds = (data.activity || []).filter(r => (r.category || "") === "Meeting" && String(r.linked || "").split(/\s*[;&]\s*/).map(s => s.trim()).includes(name) && /^\d{4}-\d{2}-\d{2}$/.test(r.date || "")).map(r => r.date).sort(); return ds.length ? ds[ds.length - 1] : ""; };
+  const totalMeetings = (data.activity || []).filter(r => (r.category || "") === "Meeting").length + (data.supervisor || []).filter(r => splitP(r.with).length).length;
+  const lastWith = name => { const ds = [...(data.activity || []).filter(r => (r.category || "") === "Meeting" && splitP(r.linked).includes(name)), ...(data.supervisor || []).filter(r => splitP(r.with).includes(name))].map(r => r.date).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d || "")).sort(); return ds.length ? ds[ds.length - 1] : ""; };
   return (
     <div>
       <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
