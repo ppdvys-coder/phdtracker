@@ -514,6 +514,8 @@ const TABS = [
   {k:"outputs", group:"overview", ic:"📦", en:"Outputs", th:"ผลงาน"},
   {k:"ideas", group:"overview", ic:"💡", en:"Ideas", th:"ไอเดีย"},
   {k:"projects", group:"overview", ic:"📁", en:"Projects", th:"โปรเจกต์"},
+  {k:"unassigned", group:"overview", ic:"📥", en:"Unassigned", th:"ยังไม่จัดหมวด"},
+  {k:"search", group:"overview", ic:"🔎", en:"Search", th:"ค้นหา"},
   {k:"contacts", group:"overview", ic:"👥", en:"Contacts", th:"ผู้ติดต่อ"},
   {k:"reports", group:"overview", ic:"📤", en:"Reports", th:"รายงาน"},
   {k:"framing", group:"phd", ic:"🧭", en:"Research Framing", th:"กรอบงานวิจัย"},
@@ -761,6 +763,8 @@ function App() {
   const undoStack = React.useRef([]);
   const [undoN, setUndoN] = useState(0);
   const [showTrash, setShowTrash] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const goSearch = q => { setSearchQ(q); setGroup("overview"); setTab("search"); };
   const pushUndo = () => { try { undoStack.current.push(JSON.stringify(dataRef.current)); if (undoStack.current.length > 30) undoStack.current.shift(); setUndoN(undoStack.current.length); } catch (e) {} };
   const undo = () => { const prev = undoStack.current.pop(); if (prev != null) { try { setData(JSON.parse(prev)); } catch (e) {} } setUndoN(undoStack.current.length); };
 
@@ -881,6 +885,11 @@ function App() {
           <div style={{ fontSize: 22, fontWeight: 800 }}>🎓 Pundharee Dashboard</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <button onClick={goAdd} title={lang === "th" ? "ไปหน้าเพิ่มข้อมูล" : "go to the Add page"} style={{ background: "#fff", color: AUB, border: "none", borderRadius: 8, padding: "7px 15px", cursor: "pointer", fontSize: 13, fontWeight: 800 }}>＋ {lang === "th" ? "เพิ่ม" : "Add"}</button>
+            <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "0 8px" }}>
+              <span style={{ fontSize: 12, color: "#D9CCE6" }}>🔎</span>
+              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && searchQ.trim()) { setGroup("overview"); setTab("search"); } }} placeholder={lang === "th" ? "ค้นหา…" : "Search…"} style={{ border: "none", background: "transparent", color: "#fff", outline: "none", fontSize: 12, padding: "6px 6px", width: 130 }} />
+              {searchQ && <button onClick={() => { setGroup("overview"); setTab("search"); }} style={{ border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontSize: 12 }}>↵</button>}
+            </div>
             <div style={{ display: "flex", border: "1px solid #6B4E8C", borderRadius: 7, overflow: "hidden" }}>
               {["en","th"].map(lg => (
                 <button key={lg} onClick={() => setLang(lg)} style={{ border: "none", cursor: "pointer", padding: "5px 11px", fontSize: 12, fontWeight: 700, color: lang === lg ? AUB : "#fff", background: lang === lg ? "#fff" : "transparent" }}>{lg.toUpperCase()}</button>
@@ -939,7 +948,7 @@ function App() {
           : tab === "lecdash" ? <LecturerDashboard data={data} setTab={setTab} lang={lang} />
           : tab === "lecexport" ? <LecturerExport data={data} lang={lang} />
           : tab === "events" ? <EventsTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
-          : tab === "supervisor" ? <SupervisorTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
+          : tab === "supervisor" ? <SupervisorTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} goSearch={goSearch} lang={lang} />
           : tab === "add" ? <AddHub data={data} setData={setData} quickAdd={quickAdd} pushUndo={pushUndo} lang={lang} />
           : tab === "reports" ? <ReportsHub data={data} lang={lang} />
           : tab === "activity" ? <ActivityLog data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} setRow={setRow} addRowWith={addRowWith} setData={setData} lang={lang} />
@@ -947,6 +956,8 @@ function App() {
           : tab === "chula" ? <RoleSummaryTab data={data} role="Chula Lecturer" icon="🏛️" setTab={setTab} lang={lang} />
           : tab === "pgta" ? <RoleSummaryTab data={data} role="BSSC PGTA" icon="🎒" setTab={setTab} lang={lang} />
           : tab === "projects" ? <ProjectsTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
+          : tab === "unassigned" ? <RoleSummaryTab data={data} role="Unassigned" icon="📥" setTab={setTab} lang={lang} />
+          : tab === "search" ? <SearchResults data={data} q={searchQ} setQ={setSearchQ} goSearch={goSearch} setTab={setTab} setGroup={setGroup} lang={lang} />
           : <TableTab tabKey={tab} data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
       </div>
 
@@ -1048,6 +1059,47 @@ function ProjectsTab({ data, update, addRow, delRow, exportCSV, lang }) {
       </div>
       {byStatus.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{byStatus.map(({ s, n }) => (<span key={s} style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: STAT_COLOR[s] || GREY, borderRadius: 6, padding: "3px 9px" }}>{s} · {n}</span>))}</div>}
       <TableTab tabKey="projects" data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} filterRole={roleF} sortKey="start" sortDir="desc" />
+    </div>
+  );
+}
+
+const SEARCH_STORES = ["activity", "tasks", "projects", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
+function SearchResults({ data, q, setQ, goSearch, setTab, setGroup, lang }) {
+  const T = (th, en) => lang === "th" ? th : en;
+  const query = (q || "").trim().toLowerCase();
+  const byStore = {};
+  if (query) SEARCH_STORES.forEach(store => (data[store] || []).forEach(row => { if (JSON.stringify(row).toLowerCase().includes(query)) (byStore[store] = byStore[store] || []).push(row); }));
+  const total = Object.values(byStore).reduce((a, r) => a + r.length, 0);
+  const openStore = store => { const g = (TABS.find(x => x.k === store) || {}).group || "overview"; setGroup(g); setTab(store); };
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>🔎 {T("ค้นหา", "Search")}</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0 14px" }}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder={T("พิมพ์ชื่อคน / คำ / หมวด…", "type a name / word / category…")} autoFocus style={{ flex: "1 1 280px", maxWidth: 440, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "9px 12px", fontSize: 14, boxSizing: "border-box" }} />
+        {q && <button onClick={() => setQ("")} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 6, padding: "8px 12px", cursor: "pointer", fontSize: 12 }}>{T("ล้าง", "Clear")}</button>}
+      </div>
+      {!query ? <div style={{ fontSize: 13, color: GREY }}>{T("พิมพ์เพื่อค้นหาทุกแท็บ — คลิกผลลัพธ์เพื่อไปที่แท็บนั้น", "Type to search across every tab — click a result to jump to its tab.")}</div>
+        : total === 0 ? <div style={{ fontSize: 13, color: GREY }}>{T(`ไม่พบ "${q}"`, `No matches for "${q}"`)}</div>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ fontSize: 12, color: GREY }}>{T(`พบ ${total} รายการ ใน ${Object.keys(byStore).length} แท็บ`, `${total} results across ${Object.keys(byStore).length} tabs`)}</div>
+              {Object.entries(byStore).map(([store, rows]) => (
+                <div key={store} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10, overflow: "hidden" }}>
+                  <div onClick={() => openStore(store)} style={{ background: CARD, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <span style={{ fontWeight: 800, color: AUB, fontSize: 13 }}>{TRASH_STORE_LABELS[store] || store}</span>
+                    <span style={{ fontSize: 11, color: GREY }}>{rows.length}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: AUB2 }}>{T("เปิดแท็บ", "open tab")} →</span>
+                  </div>
+                  {rows.slice(0, 20).map((row, i) => (
+                    <div key={i} onClick={() => openStore(store)} style={{ padding: "7px 12px", borderTop: `1px solid ${BORDER}`, cursor: "pointer", fontSize: 12, display: "flex", gap: 8, alignItems: "baseline" }}>
+                      <span style={{ color: GREY, width: 78, flex: "0 0 auto" }}>{row.date || ""}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>{trashLabel(row)}</span>
+                      {row.role && <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: roleColor(row.role), borderRadius: 4, padding: "1px 6px", flex: "0 0 auto" }}>{roleLab(lang, row.role)}</span>}
+                    </div>
+                  ))}
+                  {rows.length > 20 && <div style={{ padding: "6px 12px", fontSize: 11, color: GREY, borderTop: `1px solid ${BORDER}` }}>+{rows.length - 20} {T("เพิ่มเติม", "more")}</div>}
+                </div>
+              ))}
+            </div>}
     </div>
   );
 }
@@ -2614,7 +2666,7 @@ function TaskTracker({ data, update, setTab, lang }) {
 }
 
 // ---- Supervisor tab: team info + meeting log ----
-function SupervisorTab({ data, update, addRow, delRow, exportCSV, lang }) {
+function SupervisorTab({ data, update, addRow, delRow, exportCSV, goSearch, lang }) {
   const team = data.supervisorTeam || SUP_TEAM_SEED;
   // people met, counted from Activity Log meetings (linked) + the supervision log ("with"); supervisors always shown
   const ALWAYS_SHOW = ["Michael Pitt", "Vivi (Qiuchen Lu)", "Junpeng Lyu", "Adrien Cooper"];
@@ -2639,8 +2691,8 @@ function SupervisorTab({ data, update, addRow, delRow, exportCSV, lang }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {meetingCounts.map(([name, n]) => { const last = lastWith(name);
               return (
-                <div key={name} style={{ border: `1px solid ${BORDER}`, borderTop: `3px solid ${AUB2}`, borderRadius: 10, padding: "8px 12px", minWidth: 130, background: OFF }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: AUB }}>{name}</div>
+                <div key={name} onClick={() => goSearch && goSearch(name)} title={lang === "th" ? "คลิกเพื่อค้นหาทุกที่ที่พบชื่อนี้" : "click to search everywhere this name appears"} style={{ border: `1px solid ${BORDER}`, borderTop: `3px solid ${AUB2}`, borderRadius: 10, padding: "8px 12px", minWidth: 130, background: OFF, cursor: goSearch ? "pointer" : "default" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: AUB }}>{name} <span style={{ fontSize: 9, color: AUB2 }}>🔎</span></div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: AUB, lineHeight: 1.1 }}>{n} <span style={{ fontSize: 11, fontWeight: 600, color: GREY }}>{lang === "th" ? "ครั้ง" : (n === 1 ? "meeting" : "meetings")}</span></div>
                   {last && <div style={{ fontSize: 10, color: GREY, marginTop: 1 }}>{lang === "th" ? "ล่าสุด " : "last "}{last}</div>}
                 </div>
