@@ -1630,6 +1630,8 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
   const [yearF, setYearF] = useState("all");
   const [roleF, setRoleF] = useState("all");
   const [editing, setEditing] = useState(null);
+  const [view, setView] = useState("list");     // list · week · month · year
+  const [cal, setCal] = useState(() => new Date());
   const locale = lang === "th" ? "th-TH" : "en-GB";
   const vault = (data.meta && data.meta.vault) || "";
   const contactNames = data.contacts.map(c => c.name).filter(Boolean);
@@ -1687,23 +1689,85 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
     );
   };
 
+  const full = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+  const byDay = {}; entries.forEach(o => { if (full(o.e.date)) (byDay[o.e.date] = byDay[o.e.date] || []).push(o); });
+  const ds2 = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const navBtnS = { width: 30, height: 30, border: `1px solid ${BORDER}`, background: "#fff", color: AUB, borderRadius: 6, cursor: "pointer", fontSize: 16, lineHeight: 1 };
+
+  const renderWeek = () => {
+    const d = new Date(cal), dow = (d.getDay() + 6) % 7, monday = new Date(d); monday.setDate(d.getDate() - dow);
+    const days = Array.from({ length: 7 }, (_, k) => { const dd = new Date(monday); dd.setDate(monday.getDate() + k); return dd; });
+    const dowN = lang === "th" ? ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const sun = days[6];
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <button onClick={() => { const n = new Date(cal); n.setDate(n.getDate() - 7); setCal(n); }} style={navBtnS}>‹</button>
+          <div style={{ fontSize: 14, fontWeight: 800, color: AUB, minWidth: 200, textAlign: "center" }}>{monday.toLocaleString(locale, { day: "numeric", month: "short" })} – {sun.toLocaleString(locale, { day: "numeric", month: "short", year: "numeric" })}</div>
+          <button onClick={() => { const n = new Date(cal); n.setDate(n.getDate() + 7); setCal(n); }} style={navBtnS}>›</button>
+          <button onClick={() => setCal(new Date())} style={{ ...navBtnS, width: "auto", padding: "0 12px", fontSize: 12 }}>{L("today")}</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 5 }}>
+          {days.map((dt, k) => { const key = ds2(dt), items = byDay[key] || [], isT = key === today;
+            return (
+              <div key={k} onDoubleClick={() => openNew({ date: key })} style={{ minHeight: 120, background: "#fff", border: `1px solid ${isT ? AUB : BORDER}`, borderRadius: 6, padding: 5 }}>
+                <div style={{ fontSize: 11, fontWeight: isT ? 800 : 600, color: isT ? AUB : GREY, marginBottom: 3 }}>{dowN[k]} {dt.getDate()}</div>
+                {items.map(o => <div key={o.i} onClick={() => openEdit(o.i)} title={o.e.activity} style={{ fontSize: 10, color: "#fff", background: ACT_COLOR[o.e.category] || GREY, borderRadius: 4, padding: "2px 5px", marginBottom: 2, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.e.activity || "—"}</div>)}
+              </div>
+            ); })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderYear = () => {
+    const y = cal.getFullYear(), mset = {};
+    entries.forEach(o => { const m = (o.e.date || "").match(/^(\d{4})-(\d{2})/); if (m && m[1] === String(y)) mset[m[2]] = (mset[m[2]] || 0) + 1; });
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <button onClick={() => setCal(new Date(y - 1, cal.getMonth(), 1))} style={navBtnS}>‹</button>
+          <div style={{ fontSize: 16, fontWeight: 800, color: AUB, minWidth: 80, textAlign: "center" }}>{y}</div>
+          <button onClick={() => setCal(new Date(y + 1, cal.getMonth(), 1))} style={navBtnS}>›</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))", gap: 10 }}>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map(mo => { const key = String(mo).padStart(2, "0"), n = mset[key] || 0;
+            return (
+              <button key={mo} onClick={() => { setCal(new Date(y, mo - 1, 1)); setView("month"); }} style={{ textAlign: "left", background: "#fff", border: `1px solid ${BORDER}`, borderTop: `3px solid ${n ? AUB2 : BORDER}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: AUB }}>{new Date(y, mo - 1, 1).toLocaleString(locale, { month: "long" })}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: n ? AUB : "#C4C4C4", lineHeight: 1.2 }}>{n} <span style={{ fontSize: 10, fontWeight: 400, color: GREY }}>{lang === "th" ? "รายการ" : "items"}</span></div>
+              </button>
+            ); })}
+        </div>
+      </div>
+    );
+  };
+
+  const viewBtn = (k, label) => (<button onClick={() => setView(k)} style={{ border: "none", cursor: "pointer", padding: "6px 14px", fontSize: 12, fontWeight: view === k ? 700 : 500, color: view === k ? "#fff" : AUB2, background: view === k ? AUB : "#fff" }}>{label}</button>);
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-        {chip(yearF === "all", () => setYearF("all"), lang === "th" ? "ทั้งหมด" : "All")}
-        {years.map(y => chip(yearF === y, () => setYearF(y), y))}
-        <button onClick={() => setOrder(o => o === "desc" ? "asc" : "desc")} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 6, padding: "4px 11px", cursor: "pointer", fontSize: 12 }}>
+        <div style={{ display: "flex", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+          {viewBtn("list", lang === "th" ? "รายการ" : "List")}{viewBtn("week", lang === "th" ? "สัปดาห์" : "Week")}{viewBtn("month", lang === "th" ? "เดือน" : "Month")}{viewBtn("year", lang === "th" ? "ปี" : "Year")}
+        </div>
+        {view === "list" && chip(yearF === "all", () => setYearF("all"), lang === "th" ? "ทั้งหมด" : "All")}
+        {view === "list" && years.map(y => chip(yearF === y, () => setYearF(y), y))}
+        {view === "list" && <button onClick={() => setOrder(o => o === "desc" ? "asc" : "desc")} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 6, padding: "4px 11px", cursor: "pointer", fontSize: 12 }}>
           {order === "desc" ? (lang === "th" ? "ใหม่ → เก่า ↓" : "Newest first ↓") : (lang === "th" ? "เก่า → ใหม่ ↑" : "Oldest first ↑")}
-        </button>
+        </button>}
         <button onClick={() => openNew({})} style={{ background: AUB, color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>{L("addEntry")}</button>
-        <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{keys.length} {lang === "th" ? "เดือน" : "months"}</span>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         {[["all", L("allRoles")], ...ROLES.map(r => [r, roleLab(lang, r)])].map(([k, lb]) => (
           <button key={k} onClick={() => setRoleF(k)} title={k === "all" ? "" : rolePeriod(k)} style={{ border: `1px solid ${roleF === k ? AUB : BORDER}`, background: roleF === k ? (k === "all" ? AUB : roleColor(k)) : "#fff", color: roleF === k ? "#fff" : AUB2, borderRadius: 999, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: roleF === k ? 700 : 500 }}>{lb}</button>
         ))}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {view === "month" && <CalendarView indexed={entries} full={full} cal={cal} setCal={setCal} openEdit={openEdit} openNew={openNew} lang={lang} />}
+      {view === "week" && renderWeek()}
+      {view === "year" && renderYear()}
+      {view === "list" && <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {keys.map(key => renderMonth(key, groups[key]))}
         {undated.length > 0 && yearF === "all" && (
           <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10, overflow: "hidden" }}>
@@ -1720,7 +1784,7 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
           </div>
         )}
         {keys.length === 0 && undated.length === 0 && <div style={{ fontSize: 12, color: GREY, textAlign: "center", padding: 30 }}>—</div>}
-      </div>
+      </div>}
       {editing && <EntryModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} vault={vault} contactNames={contactNames} tagSuggestions={[...new Set((data.activity || []).flatMap(x => String(x.tag || "").split(/[;,]/).map(s => s.trim()).filter(Boolean)))]} lang={lang} />}
     </div>
   );
