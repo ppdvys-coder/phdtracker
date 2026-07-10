@@ -1257,33 +1257,61 @@ function PeopleTagCell({ value, onChange, suggestions, lang }) {
   );
 }
 
+// date cell: type freely (also supports partial like 2024-01) OR pick from a calendar via 📅
+const DATE_COL_KEYS = ["date", "start", "end", "pStart", "pEnd", "aStart", "aEnd", "due", "deadline", "opens", "submitted", "captured"];
+const isDateColumn = c => c.type ? false : (DATE_COL_KEYS.includes(c.k) || ((c.k === "first" || c.k === "last") && /contact/i.test(c.l || "")));
+function DateCell({ value, onChange, common }) {
+  const ref = React.useRef(null);
+  return (
+    <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+      <input value={value || ""} onChange={e => onChange(e.target.value)} placeholder="YYYY-MM-DD" style={{ ...common, flex: 1, minWidth: 0 }} />
+      <span onClick={() => { const el = ref.current; if (!el) return; try { el.showPicker(); } catch (e) { el.focus(); } }} title="calendar" style={{ cursor: "pointer", fontSize: 12, color: AUB2, padding: "0 6px", flex: "0 0 auto" }}>📅</span>
+      <input ref={ref} type="date" value={/^\d{4}-\d{2}-\d{2}$/.test(value || "") ? value : ""} onChange={e => onChange(e.target.value)} tabIndex={-1} style={{ position: "absolute", right: 4, bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
+    </div>
+  );
+}
+
 function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortKey, sortDir, filterRole }) {
   const cs = cols[tabKey]; const rows = data[tabKey] || []; const L = k => t(lang, k);
-  // optional display sort/filter — keeps each row's real index (i) so edit/delete still target the right row
+  const [sortCol, setSortCol] = useState(null); const [sortAsc, setSortAsc] = useState(true);
+  const [filters, setFilters] = useState({}); const [showFilters, setShowFilters] = useState(false);
+  const cellText = (row, c) => { const v = row[c.k]; return v == null ? "" : String(v); };
+  // keeps each row's real index (i) so edit/delete still target the right row
   let view = rows.map((r, i) => ({ r, i }));
-  if (filterRole && filterRole !== "all") view = view.filter(o => (o.r.role || "") === filterRole);
-  if (sortKey) {
-    const dir = sortDir === "desc" ? -1 : 1;
+  if (filterRole && filterRole !== "all") view = view.filter(o => hasRole(o.r, filterRole));
+  Object.entries(filters).forEach(([k, val]) => { const q = String(val || "").trim().toLowerCase(); if (q) { const c = cs.find(x => x.k === k); if (c) view = view.filter(o => cellText(o.r, c).toLowerCase().includes(q)); } });
+  const eKey = sortCol || sortKey, eDir = sortCol ? (sortAsc ? "asc" : "desc") : sortDir;
+  if (eKey) {
+    const dir = eDir === "desc" ? -1 : 1;
     view = view.slice().sort((a, b) => {
-      const av = a.r[sortKey] || "", bv = b.r[sortKey] || "";
+      const av = a.r[eKey] || "", bv = b.r[eKey] || "";
       if (!av && !bv) return 0;
-      if (!av) return 1; if (!bv) return -1;           // blank dates always sink to the bottom
-      return (av < bv ? -1 : av > bv ? 1 : 0) * dir;
+      if (!av) return 1; if (!bv) return -1;           // blanks always sink to the bottom
+      return (String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0) * dir;
     });
   }
+  const toggleSort = k => { if (sortCol === k) { if (sortAsc) setSortAsc(false); else { setSortCol(null); setSortAsc(true); } } else { setSortCol(k); setSortAsc(true); } };
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
         <button onClick={() => addRow(tabKey)} style={{ background: AUB, color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>{L("addRow")}</button>
         <button onClick={() => exportCSV(tabKey)} style={{ background: "#fff", color: AUB2, border: `1px solid ${BORDER}`, borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12 }}>{L("exportCSV")}</button>
-        <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{L("clickEdit")}</span>
+        <button onClick={() => setShowFilters(s => !s)} style={{ background: showFilters ? CARD : "#fff", color: AUB2, border: `1px solid ${showFilters ? AUB : BORDER}`, borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: showFilters ? 700 : 400 }}>⚟ {lang === "th" ? "ตัวกรอง" : "Filter"}</button>
+        {(sortCol || Object.values(filters).some(Boolean)) && <button onClick={() => { setSortCol(null); setFilters({}); }} style={{ background: "#fff", color: AUB2, border: `1px solid ${BORDER}`, borderRadius: 6, padding: "7px 10px", cursor: "pointer", fontSize: 12 }}>✕ {lang === "th" ? "ล้าง" : "Clear"}</button>}
+        <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{view.length !== rows.length ? `${view.length}/${rows.length} · ` : ""}{lang === "th" ? "คลิกหัวตารางเพื่อเรียง" : "click a header to sort"}</span>
       </div>
       <div style={{ overflowX: "auto", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
-          <thead><tr>
-            {cs.map(c => (<th key={c.k} style={{ background: AUB, color: "#fff", textAlign: "left", padding: "8px", fontWeight: 700, minWidth: c.w }}>{colLab(lang, c.l)}</th>))}
-            <th style={{ background: AUB, width: 34 }} />
-          </tr></thead>
+          <thead>
+            <tr>
+              {cs.map(c => (<th key={c.k} onClick={() => toggleSort(c.k)} title={lang === "th" ? "คลิกเพื่อเรียง" : "click to sort"} style={{ background: AUB, color: "#fff", textAlign: "left", padding: "8px", fontWeight: 700, minWidth: c.w, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>{colLab(lang, c.l)}{sortCol === c.k ? (sortAsc ? " ▲" : " ▼") : ""}</th>))}
+              <th style={{ background: AUB, width: 34 }} />
+            </tr>
+            {showFilters && <tr>
+              {cs.map(c => (<th key={c.k} style={{ background: "#3d1c5e", padding: "3px 4px" }}><input value={filters[c.k] || ""} onChange={e => setFilters(f => ({ ...f, [c.k]: e.target.value }))} placeholder={lang === "th" ? "กรอง…" : "filter…"} style={{ width: "100%", boxSizing: "border-box", border: "none", borderRadius: 4, padding: "3px 5px", fontSize: 11 }} /></th>))}
+              <th style={{ background: "#3d1c5e" }} />
+            </tr>}
+          </thead>
           <tbody>
             {view.map(({ r, i }, ri) => (
               <tr key={i} style={{ background: ri % 2 ? OFF : "#fff" }}>
@@ -1302,6 +1330,8 @@ function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortK
                         <select value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, cursor: "pointer" }}><option value=""></option>{c.opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
                       ) : c.type === "number" ? (
                         <input type="number" min="0" max="100" value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, textAlign: "center" }} />
+                      ) : isDateColumn(c) ? (
+                        <DateCell value={r[c.k]} onChange={v => update(tabKey, i, c.k, v)} common={common} />
                       ) : (
                         <textarea rows={1} value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, resize: "vertical", lineHeight: 1.35 }} />
                       )}
@@ -1459,8 +1489,8 @@ function EntryModal({ editing, setField, save, remove, cancel, vault, contactNam
                   : f.type === "select" ? <select value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} style={st}><option value=""></option>{f.opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
                   : f.type === "number" ? <input type="number" value={d[f.k] || 0} onChange={e => setField(f.k, e.target.value)} style={st} />
                   : f.k === "detail" ? <textarea rows={3} value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} style={{ ...st, resize: "vertical" }} />
-                  : f.k === "linked" ? <><input list="al-contacts" value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} placeholder={L("placeholder_person")} style={st} /><datalist id="al-contacts">{contactNames.map(n => <option key={n} value={n} />)}</datalist></>
-                  : <input value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} placeholder={f.k === "date" ? L("placeholder_date") : f.k === "obsidian" ? L("placeholder_obs") : ""} style={st} />}
+                  : isDateColumn(f) ? <div style={{ border: `1px solid ${BORDER}`, borderRadius: 6, padding: "1px 2px" }}><DateCell value={d[f.k]} onChange={v => setField(f.k, v)} common={{ border: "none", outline: "none", background: "transparent", font: "inherit", padding: "7px 9px", width: "100%", boxSizing: "border-box" }} /></div>
+                  : <input value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} placeholder={f.k === "obsidian" ? L("placeholder_obs") : ""} style={st} />}
                 {f.k === "obsidian" && (href ? <a href={href} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: AUB2, fontWeight: 700, textDecoration: "none", display: "inline-block", marginTop: 4 }}>{L("openObs")} ↗</a> : (d.obsidian ? <span style={{ fontSize: 11, color: GREY, display: "inline-block", marginTop: 4 }}>{L("vaultHint")}</span> : null))}
               </div>
             ); })}
