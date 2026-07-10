@@ -134,7 +134,12 @@ function elapsedLabel(startStr, lang) {
 const roleLab = (lang,r) => lang==="th" ? (ROLE_META[r] ? ROLE_META[r].th : r) : r;
 const roleColor = r => ROLE_META[r] ? ROLE_META[r].c : GREY;
 const rolePeriod = r => ROLE_META[r] ? (ROLE_META[r].period || "") : "";
-const roleOf = r => (r && r.role) ? r.role : "PhD";
+let GLOBAL_SEARCH = null;                       // App registers its goSearch here so any tag chip can trigger a search
+const fireSearch = q => { if (GLOBAL_SEARCH) GLOBAL_SEARCH(q); };
+const rolesOf = r => String((r && r.role) || "").split(",").map(s => s.trim()).filter(Boolean);
+const rolesOfU = r => { const a = rolesOf(r); return a.length ? a : ["Unassigned"]; }; // empty → Unassigned
+const hasRole = (r, role) => rolesOfU(r).includes(role);
+const roleOf = r => rolesOfU(r)[0]; // primary role (first tag), or "Unassigned"
 const TEACH_SPLIT = "2025-11-01"; // teaching before = PGTA, on/after = Lecturer
 
 const ACTIVITY_TYPES = ["Attended seminar","Gave lecture","Marked assignments","Committee meeting","Organised event","Reviewed paper","Attended conference","Supported student","Met collaborator","Prepared teaching material","Interview (fieldwork)","Supervision meeting","Reading","Writing","Other"];
@@ -171,10 +176,10 @@ function teachRecs(data) {
 function roleRecords(data) {
   const out = [];
   const teachHat = r => /pgta/i.test(r || "") ? "BSSC PGTA" : "BSSC Lecturer";
-  (data.activity || []).forEach(r => out.push({ role: roleOf(r), hours: Number(r.hours) || 0, date: r.date || "", activity: r.activity || "", category: r.category || "" }));
-  (data.teachingSessions || []).forEach(r => out.push({ role: teachHat(r.role), hours: Number(r.hours) || 0, date: r.date || "", activity: r.title || "", category: "Teaching session" }));
-  (data.marking || []).forEach(r => out.push({ role: "BSSC Lecturer", hours: Number(r.hours) || 0, date: r.date || "", activity: `Marking: ${r.title || ""}`, category: "Marking" }));
-  (data.guestLectures || []).forEach(r => out.push({ role: "BSSC Lecturer", hours: Number(r.hours) || 0, date: r.date || "", activity: `Guest lecture: ${r.title || ""}`, category: "Guest lecture" }));
+  (data.activity || []).forEach(r => out.push({ role: roleOf(r), roles: rolesOfU(r), hours: Number(r.hours) || 0, date: r.date || "", activity: r.activity || "", category: r.category || "" }));
+  (data.teachingSessions || []).forEach(r => { const h = teachHat(r.role); out.push({ role: h, roles: [h], hours: Number(r.hours) || 0, date: r.date || "", activity: r.title || "", category: "Teaching session" }); });
+  (data.marking || []).forEach(r => out.push({ role: "BSSC Lecturer", roles: ["BSSC Lecturer"], hours: Number(r.hours) || 0, date: r.date || "", activity: `Marking: ${r.title || ""}`, category: "Marking" }));
+  (data.guestLectures || []).forEach(r => out.push({ role: "BSSC Lecturer", roles: ["BSSC Lecturer"], hours: Number(r.hours) || 0, date: r.date || "", activity: `Guest lecture: ${r.title || ""}`, category: "Guest lecture" }));
   return out;
 }
 
@@ -224,22 +229,22 @@ const cols = {
   ],
   publications: [
     {k:"paper",l:"Paper (working title)",w:240},{k:"series",l:"Series #",w:70},{k:"ptype",l:"Type",w:140},
-    {k:"journal",l:"Target journal",w:200},{k:"coauthors",l:"Co-authors",w:130},
+    {k:"journal",l:"Target journal",w:200},{k:"coauthors",l:"Co-authors",w:130,type:"people"},
     {k:"status",l:"Status",w:120,type:"select",opts:["Idea","Planned","Outline","Drafting","Submitted","Under review","Revisions","Accepted","Rejected"]},
     {k:"subtype",l:"Submission type",w:130},{k:"opens",l:"Window opens",w:110},{k:"deadline",l:"Deadline",w:104},
     {k:"submitted",l:"Submitted",w:100},{k:"decision",l:"Decision",w:100},{k:"notes",l:"Notes",w:200},
   ],
   supervisor: [
-    {k:"date",l:"Date",w:90},{k:"mtype",l:"Meeting type",w:120},{k:"with",l:"Met with (people)",w:180},{k:"agenda",l:"Agenda item / topic",w:280},
+    {k:"date",l:"Date",w:90},{k:"mtype",l:"Meeting type",w:120},{k:"with",l:"Met with (people)",w:180,type:"people"},{k:"agenda",l:"Agenda item / topic",w:280},
     {k:"decision",l:"Decision / discussion",w:220},{k:"action",l:"Action item",w:220},{k:"owner",l:"Owner",w:80},
     {k:"due",l:"Due",w:90},{k:"status",l:"Status",w:120,type:"select",opts:TSTAT},
   ],
   activity: [
     {k:"date",l:"Date",w:104},{k:"category",l:"Category",w:140,type:"select",opts:ACT_CATS},
-    {k:"activity",l:"Activity / record",w:230},{k:"linked",l:"Linked to (person)",w:160},
+    {k:"activity",l:"Activity / record",w:230},{k:"linked",l:"Linked to (person)",w:160,type:"people"},
     {k:"detail",l:"Summary / notes",w:280},{k:"obsidian",l:"Obsidian note",w:180},
     {k:"output",l:"Other output / link",w:180},{k:"hours",l:"Hours",w:66,type:"number"},{k:"tag",l:"Tag",w:110},
-    {k:"role",l:"Role (job)",w:120,type:"select",opts:ROLES},
+    {k:"role",l:"Role (job)",w:120,type:"roles"},
     {k:"acttype",l:"Activity type",w:160,type:"select",opts:ACTIVITY_TYPES},
     {k:"evidence",l:"Evidence",w:160},{k:"reflection",l:"Reflection",w:220},{k:"impact",l:"Impact",w:200},
     {k:"privacy",l:"Privacy",w:110,type:"select",opts:PRIVACY},
@@ -252,28 +257,28 @@ const cols = {
   ],
   tasks: [
     {k:"title",l:"Task / action",w:300},{k:"status",l:"Status",w:130,type:"select",opts:["Not started","In progress","Awaiting","Done"]},
-    {k:"role",l:"Hat",w:110,type:"select",opts:ROLES},{k:"category",l:"Project / category",w:160},{k:"due",l:"Due / deadline",w:120},{k:"notes",l:"Notes",w:240},
+    {k:"role",l:"Hat",w:110,type:"roles"},{k:"category",l:"Project / category",w:160},{k:"due",l:"Due / deadline",w:120},{k:"notes",l:"Notes",w:240},
   ],
   sources: [
     {k:"title",l:"Title",w:280},{k:"authors",l:"Author(s)",w:160},{k:"stype",l:"Type",w:130,type:"select",opts:["Journal article","Book","Report","Conference","Thesis","Web","Standard","Other"]},
-    {k:"year",l:"Year",w:70},{k:"link",l:"Link / DOI",w:180},{k:"role",l:"Hat",w:100,type:"select",opts:ROLES},{k:"tags",l:"Tags / themes",w:160},{k:"notes",l:"Notes / annotation",w:260},
+    {k:"year",l:"Year",w:70},{k:"link",l:"Link / DOI",w:180},{k:"role",l:"Hat",w:100,type:"roles"},{k:"tags",l:"Tags / themes",w:160},{k:"notes",l:"Notes / annotation",w:260},
   ],
   outputs: [
     {k:"title",l:"Output",w:280},{k:"otype",l:"Type",w:150,type:"select",opts:["Paper","Presentation","Slide deck","Teaching material","Report","Poster","Dataset","Software / tool","Blog","Other"]},
-    {k:"date",l:"Date",w:110},{k:"role",l:"Hat",w:100,type:"select",opts:ROLES},{k:"link",l:"Link / location",w:200},{k:"category",l:"Project / module",w:150},{k:"notes",l:"Notes",w:200},{k:"privacy",l:"Privacy",w:110,type:"select",opts:PRIVACY},
+    {k:"date",l:"Date",w:110},{k:"role",l:"Hat",w:100,type:"roles"},{k:"link",l:"Link / location",w:200},{k:"category",l:"Project / module",w:150},{k:"notes",l:"Notes",w:200},{k:"privacy",l:"Privacy",w:110,type:"select",opts:PRIVACY},
   ],
   ideas: [
-    {k:"idea",l:"Idea",w:340},{k:"category",l:"Area",w:150},{k:"role",l:"Hat",w:100,type:"select",opts:ROLES},{k:"date",l:"Captured",w:110},
+    {k:"idea",l:"Idea",w:340},{k:"category",l:"Area",w:150},{k:"role",l:"Hat",w:100,type:"roles"},{k:"date",l:"Captured",w:110},
     {k:"status",l:"Status",w:130,type:"select",opts:["New","Exploring","Parked","Using","Dropped"]},{k:"notes",l:"Notes",w:240},
   ],
   projects: [
-    {k:"title",l:"Project",w:250},{k:"role",l:"Role",w:130,type:"select",opts:ROLES},
+    {k:"title",l:"Project",w:250},{k:"role",l:"Role",w:130,type:"roles"},
     {k:"status",l:"Status",w:130,type:"select",opts:["Idea","Planned","Active","On hold","Completed","Dropped"]},
     {k:"start",l:"Start",w:104},{k:"end",l:"Target / end",w:104},{k:"category",l:"Area / type",w:150},
-    {k:"people",l:"Collaborators",w:170},{k:"link",l:"Link / location",w:190},{k:"notes",l:"Notes",w:280},
+    {k:"people",l:"Collaborators",w:170,type:"people"},{k:"link",l:"Link / location",w:190},{k:"notes",l:"Notes",w:280},
   ],
   reflections: [
-    {k:"date",l:"Date",w:110},{k:"role",l:"Hat",w:100,type:"select",opts:ROLES},{k:"context",l:"Context / activity",w:200},{k:"reflection",l:"Reflection",w:360},{k:"linked",l:"Linked to",w:150},{k:"privacy",l:"Privacy",w:110,type:"select",opts:PRIVACY},
+    {k:"date",l:"Date",w:110},{k:"role",l:"Hat",w:100,type:"roles"},{k:"context",l:"Context / activity",w:200},{k:"reflection",l:"Reflection",w:360},{k:"linked",l:"Linked to",w:150},{k:"privacy",l:"Privacy",w:110,type:"select",opts:PRIVACY},
   ],
   teachingSessions: [
     {k:"title",l:"Title",w:240},{k:"date",l:"Date",w:104},{k:"ay",l:"Academic year",w:110},{k:"institution",l:"Institution",w:150},
@@ -765,6 +770,7 @@ function App() {
   const [showTrash, setShowTrash] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const goSearch = q => { setSearchQ(q); setGroup("overview"); setTab("search"); };
+  GLOBAL_SEARCH = goSearch;
   const pushUndo = () => { try { undoStack.current.push(JSON.stringify(dataRef.current)); if (undoStack.current.length > 30) undoStack.current.shift(); setUndoN(undoStack.current.length); } catch (e) {} };
   const undo = () => { const prev = undoStack.current.pop(); if (prev != null) { try { setData(JSON.parse(prev)); } catch (e) {} } setUndoN(undoStack.current.length); };
 
@@ -864,10 +870,10 @@ function App() {
     const followups = C.filter(r => r.follow === "Yes").length;
     const unverified = Object.values(data).flat().reduce((a, r) => a + ((r && r._a && r._a.length) || 0), 0);
     const A = roleRecords(data);
-    const roleAgg = ROLES.map(role => { const rs = A.filter(x => x.role === role); return { role, count: rs.length, hours: rs.reduce((a, x) => a + (Number(x.hours) || 0), 0) }; });
+    const roleAgg = ROLES.map(role => { const rs = A.filter(x => x.roles.includes(role)); return { role, count: rs.length, hours: rs.reduce((a, x) => a + (Number(x.hours) || 0), 0) }; });
     const nowMs = Date.now(), c30 = nowMs - 30 * 86400000;
     const inLast30 = d => { if (!/^\d{4}-\d{2}-\d{2}$/.test(d || "")) return false; const ms = new Date(d).getTime(); return !isNaN(ms) && ms >= c30 && ms <= nowMs; };
-    const last30 = ROLES.map(role => ({ role, count: A.filter(x => x.role === role && inLast30(x.date)).length }));
+    const last30 = ROLES.map(role => ({ role, count: A.filter(x => x.roles.includes(role) && inLast30(x.date)).length }));
     const recentAct = A.filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.date || "")).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 6).map(x => ({ date: x.date, role: x.role, activity: x.activity, category: x.category }));
     return { overall, done, total: T.length, intvDone, intvTotal, phase, pubPipe, ev, papers, followups, contacts: C.length, activities: data.activity.length, unverified, roleAgg, last30, recentAct };
   }, [data]);
@@ -1005,11 +1011,12 @@ function TrashModal({ data, restoreTrash, restoreAllTrash, emptyTrash, close, la
 
 function RoleSummaryTab({ data, role, icon, setTab, lang }) {
   const T = (th, en) => lang === "th" ? th : en;
-  const recs = roleRecords(data).filter(x => x.role === role);
-  const tasks = (data.tasks || []).filter(r => (r.role || "") === role);
-  const refl = (data.reflections || []).filter(r => (r.role || "") === role);
-  const ideas = (data.ideas || []).filter(r => (r.role || "") === role);
-  const outputs = (data.outputs || []).filter(r => (r.role || "") === role);
+  const recs = roleRecords(data).filter(x => x.roles.includes(role));
+  const tasks = (data.tasks || []).filter(r => hasRole(r, role));
+  const refl = (data.reflections || []).filter(r => hasRole(r, role));
+  const ideas = (data.ideas || []).filter(r => hasRole(r, role));
+  const outputs = (data.outputs || []).filter(r => hasRole(r, role));
+  const projects = (data.projects || []).filter(r => hasRole(r, role));
   const hoursTotal = recs.reduce((a, x) => a + (Number(x.hours) || 0), 0);
   const recent = recs.filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.date || "")).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 12);
   const per = rolePeriod(role), el = elapsedLabel(roleStart(role), lang);
@@ -1021,11 +1028,22 @@ function RoleSummaryTab({ data, role, icon, setTab, lang }) {
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Kpi label={T("กิจกรรม/บันทึก", "Activities")} value={recs.length} sub={hoursTotal ? `${hoursTotal}${T("ชม.", "h")}` : ""} />
+        <Kpi label={T("โปรเจกต์", "Projects")} value={projects.length} />
         <Kpi label={T("งาน", "Tasks")} value={tasks.length} />
         <Kpi label={T("ผลงาน", "Outputs")} value={outputs.length} />
         <Kpi label={T("บันทึกสะท้อน", "Reflections")} value={refl.length} />
         <Kpi label={T("ไอเดีย", "Ideas")} value={ideas.length} />
       </div>
+      {projects.length > 0 && <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>📁 {T("โปรเจกต์", "Projects")}</div>
+        {projects.map((p, i) => (
+          <div key={i} onClick={() => setTab("projects")} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, padding: "6px 0", borderTop: i ? `1px solid ${BORDER}` : "none", cursor: "pointer" }}>
+            <span style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>{p.title || "—"}</span>
+            {p.status && <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: STAT_COLOR[p.status] || GREY, borderRadius: 4, padding: "1px 6px", flex: "0 0 auto" }}>{p.status}</span>}
+            {(p.start || p.end) && <span style={{ fontSize: 10, color: GREY, flex: "0 0 auto" }}>{p.start || ""}{p.end ? " → " + p.end : ""}</span>}
+          </div>
+        ))}
+      </div>}
       <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>{T("กิจกรรมล่าสุด", "Recent activity")}</div>
         {recent.length ? recent.map((x, i) => (
@@ -1045,8 +1063,8 @@ function ProjectsTab({ data, update, addRow, delRow, exportCSV, lang }) {
   const [roleF, setRoleF] = useState("all");
   const T = (th, en) => lang === "th" ? th : en;
   const projects = data.projects || [];
-  const countFor = k => k === "all" ? projects.length : projects.filter(p => (p.role || "") === k).length;
-  const shown = roleF === "all" ? projects : projects.filter(p => (p.role || "") === roleF);
+  const countFor = k => k === "all" ? projects.length : projects.filter(p => hasRole(p, k)).length;
+  const shown = roleF === "all" ? projects : projects.filter(p => hasRole(p, roleF));
   const byStatus = ["Active", "Planned", "On hold", "Idea", "Completed", "Dropped"].map(s => ({ s, n: shown.filter(p => p.status === s).length })).filter(x => x.n);
   return (
     <div>
@@ -1193,6 +1211,52 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   );
 }
 
+// Notion-style multi-role tag cell: colored chips you add/remove; value is a comma-joined string
+function RoleTagCell({ value, onChange, lang }) {
+  const [open, setOpen] = useState(false);
+  const roles = String(value || "").split(",").map(s => s.trim()).filter(Boolean);
+  const avail = ROLES.filter(r => !roles.includes(r));
+  const add = r => { onChange([...roles, r].join(", ")); setOpen(false); };
+  const remove = r => onChange(roles.filter(x => x !== r).join(", "));
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", padding: "4px 6px", position: "relative", minHeight: 28 }}>
+      {roles.map(r => (
+        <span key={r} style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: roleColor(r), borderRadius: 999, padding: "1px 4px 1px 8px", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+          {roleLab(lang, r)}<span onClick={() => remove(r)} title="remove" style={{ cursor: "pointer", opacity: 0.85, fontWeight: 400 }}>×</span>
+        </span>
+      ))}
+      <span onClick={() => setOpen(o => !o)} title={lang === "th" ? "เพิ่มหมวก" : "add role"} style={{ fontSize: 12, color: AUB2, cursor: "pointer", border: `1px dashed ${BORDER}`, borderRadius: 999, padding: "0 6px", lineHeight: "17px" }}>＋</span>
+      {open && <>
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
+        <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 20, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, boxShadow: "0 6px 20px rgba(0,0,0,.18)", padding: 4, minWidth: 150 }}>
+          {avail.length ? avail.map(r => (<div key={r} onClick={() => add(r)} style={{ padding: "5px 8px", fontSize: 12, cursor: "pointer", borderRadius: 5, display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: roleColor(r) }} />{roleLab(lang, r)}</div>)) : <div style={{ padding: "5px 8px", fontSize: 11, color: GREY }}>—</div>}
+        </div>
+      </>}
+    </div>
+  );
+}
+
+// Notion-style people tag cell: chips you add by typing (autocompletes from contacts); click a name to search
+function PeopleTagCell({ value, onChange, suggestions, lang }) {
+  const [txt, setTxt] = useState("");
+  const dlId = React.useRef("ppl" + Math.random().toString(36).slice(2, 8)).current;
+  const people = String(value || "").split(/\s*[;,&]\s*/).map(s => s.trim()).filter(Boolean);
+  const add = name => { const n = (name || "").trim(); if (n && !people.includes(n)) onChange([...people, n].join("; ")); setTxt(""); };
+  const remove = name => onChange(people.filter(x => x !== name).join("; "));
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", padding: "4px 6px", minHeight: 28 }}>
+      {people.map(p => (
+        <span key={p} style={{ fontSize: 10, fontWeight: 600, color: AUB, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 999, padding: "1px 4px 1px 8px", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+          <span onClick={() => fireSearch(p)} title={lang === "th" ? "คลิกเพื่อค้นหาคนนี้" : "click to search this person"} style={{ cursor: "pointer" }}>{p}</span>
+          <span onClick={() => remove(p)} title="remove" style={{ cursor: "pointer", color: GREY }}>×</span>
+        </span>
+      ))}
+      <input value={txt} onChange={e => setTxt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(txt); } }} onBlur={() => txt.trim() && add(txt)} list={dlId} placeholder={people.length ? "" : (lang === "th" ? "+ ชื่อ" : "+ name")} style={{ border: "none", outline: "none", background: "transparent", fontSize: 11, minWidth: 56, flex: 1, padding: "2px" }} />
+      <datalist id={dlId}>{(suggestions || []).map(n => <option key={n} value={n} />)}</datalist>
+    </div>
+  );
+}
+
 function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortKey, sortDir, filterRole }) {
   const cs = cols[tabKey]; const rows = data[tabKey] || []; const L = k => t(lang, k);
   // optional display sort/filter — keeps each row's real index (i) so edit/delete still target the right row
@@ -1230,7 +1294,11 @@ function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortK
                   const common = { width: "100%", border: "none", background: "transparent", font: "inherit", color, fontWeight: weight, outline: "none", padding: "6px 8px", boxSizing: "border-box" };
                   return (
                     <td key={c.k} style={{ border: `1px solid ${BORDER}`, verticalAlign: "top" }}>
-                      {c.type === "select" ? (
+                      {c.type === "roles" ? (
+                        <RoleTagCell value={r[c.k]} onChange={v => update(tabKey, i, c.k, v)} lang={lang} />
+                      ) : c.type === "people" ? (
+                        <PeopleTagCell value={r[c.k]} onChange={v => update(tabKey, i, c.k, v)} suggestions={(data.contacts || []).map(x => x.name).filter(Boolean)} lang={lang} />
+                      ) : c.type === "select" ? (
                         <select value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, cursor: "pointer" }}><option value=""></option>{c.opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
                       ) : c.type === "number" ? (
                         <input type="number" min="0" max="100" value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, textAlign: "center" }} />
@@ -1259,7 +1327,7 @@ function ActivityLog({ data, update, addRow, delRow, exportCSV, setRow, addRowWi
   const [roleF, setRoleF] = useState("all");
   const L = k => t(lang, k);
   const entries = data.activity; const indexed = entries.map((e, i) => ({ e, i }));
-  const shown = roleF === "all" ? indexed : indexed.filter(o => roleOf(o.e) === roleF);
+  const shown = roleF === "all" ? indexed : indexed.filter(o => hasRole(o.e, roleF));
   const full = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
   const vault = (data.meta && data.meta.vault) || "";
   const contactNames = data.contacts.map(c => c.name).filter(Boolean);
@@ -1386,7 +1454,9 @@ function EntryModal({ editing, setField, save, remove, cancel, vault, contactNam
             return (
               <div key={f.k}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: AUB2, display: "block", marginBottom: 3 }}>{colLab(lang, f.l)}{assumed && <span style={{ color: RED }}> ●</span>}</label>
-                {f.type === "select" ? <select value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} style={st}><option value=""></option>{f.opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
+                {f.type === "roles" ? <div style={{ border: `1px solid ${BORDER}`, borderRadius: 6 }}><RoleTagCell value={d[f.k]} onChange={v => setField(f.k, v)} lang={lang} /></div>
+                  : f.type === "people" ? <div style={{ border: `1px solid ${BORDER}`, borderRadius: 6 }}><PeopleTagCell value={d[f.k]} onChange={v => setField(f.k, v)} suggestions={contactNames} lang={lang} /></div>
+                  : f.type === "select" ? <select value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} style={st}><option value=""></option>{f.opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
                   : f.type === "number" ? <input type="number" value={d[f.k] || 0} onChange={e => setField(f.k, e.target.value)} style={st} />
                   : f.k === "detail" ? <textarea rows={3} value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} style={{ ...st, resize: "vertical" }} />
                   : f.k === "linked" ? <><input list="al-contacts" value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} placeholder={L("placeholder_person")} style={st} /><datalist id="al-contacts">{contactNames.map(n => <option key={n} value={n} />)}</datalist></>
@@ -1510,7 +1580,7 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
   const vault = (data.meta && data.meta.vault) || "";
   const contactNames = data.contacts.map(c => c.name).filter(Boolean);
   const entriesAll = data.activity.map((e, i) => ({ e, i }));
-  const entries = roleF === "all" ? entriesAll : entriesAll.filter(o => roleOf(o.e) === roleF);
+  const entries = roleF === "all" ? entriesAll : entriesAll.filter(o => hasRole(o.e, roleF));
 
   const groups = {}; const undated = [];
   entries.forEach(o => { const m = (o.e.date || "").match(/^(\d{4})-(\d{2})/); if (m) { const key = `${m[1]}-${m[2]}`; (groups[key] = groups[key] || []).push(o); } else undated.push(o); });
@@ -2388,7 +2458,7 @@ function repTeaching(data) {
 }
 function repWorkload(data, excl) {
   const A = roleRecords(data);
-  const byHat = ROLES.map(role => { const rs = A.filter(x => x.role === role); return { role, n: rs.length, h: rs.reduce((a, x) => a + (Number(x.hours) || 0), 0) }; }).filter(x => x.n);
+  const byHat = ROLES.map(role => { const rs = A.filter(x => x.roles.includes(role)); return { role, n: rs.length, h: rs.reduce((a, x) => a + (Number(x.hours) || 0), 0) }; }).filter(x => x.n);
   const byMonth = {}; A.forEach(x => { const m = (x.date || "").slice(0, 7); if (/^\d{4}-\d{2}$/.test(m)) byMonth[m] = (byMonth[m] || 0) + 1; });
   const months = Object.keys(byMonth).sort().slice(-12);
   const evid = (data.activity || []).filter(x => notPriv(x, excl) && x.evidence && String(x.evidence).trim());
@@ -2545,7 +2615,7 @@ function lecAnnual(data) { return { title: "Annual Teaching Record", sub: ayNow(
   { h: "Marking", items: (data.marking || []).map(r => `${r.title} (${r.nstudents || "?"} scripts)`) },
 ] }; }
 function lecWorkload(data) {
-  const rr = roleRecords(data); const byHat = ROLES.map(role => { const rs = rr.filter(x => x.role === role); return { role, n: rs.length, h: rs.reduce((a, x) => a + (Number(x.hours) || 0), 0) }; }).filter(x => x.n);
+  const rr = roleRecords(data); const byHat = ROLES.map(role => { const rs = rr.filter(x => x.roles.includes(role)); return { role, n: rs.length, h: rs.reduce((a, x) => a + (Number(x.hours) || 0), 0) }; }).filter(x => x.n);
   const sup = data.supervision || [];
   return { title: "Workload Summary", sub: "", sections: [
     { h: "By hat", items: byHat.map(x => `${roleLab("en", x.role)}: ${x.n} records${x.h ? `, ${x.h}h` : ""}`) },
