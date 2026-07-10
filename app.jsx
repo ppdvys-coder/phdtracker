@@ -107,8 +107,9 @@ const ACT_COLOR = { "Meeting":"#ED6C02","Interview":"#0277BD","Note":"#455A64","
   "Milestone":"#2E7D32","Other":"#9E9E9E","Uncategorised":"#9E9E9E" };
 
 // ---- Roles (timeline-based) ----
-const ROLES = ["PhD","Chula Lecturer","BSSC Lecturer","BSSC PGTA","Service/Admin","Personal"];
+const ROLES = ["PhD","Chula Lecturer","BSSC Lecturer","BSSC PGTA","Service/Admin","Personal","Unassigned"];
 const ROLE_META = {
+  "Unassigned":{th:"ยังไม่จัดหมวด", c:"#9E9E9E", period:"", start:""},
   "PhD":{th:"ปริญญาเอก", c:"#2B1241", period:"Sep 2023 – present", start:"2023-09-25"},
   "Chula Lecturer":{th:"อาจารย์ จุฬาฯ", c:"#C2185B", period:"Sep 2024 – present", start:"2024-09-01"},
   "BSSC Lecturer":{th:"อาจารย์ BSSC", c:"#00796B", period:"Nov 2025 – present", start:"2025-11-01"},
@@ -1065,7 +1066,7 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   const L = k => t(lang, k);
   const phaseName = p => lang === "th" ? (PHASE_TH[p] || p) : p;
   const totalAct = m.roleAgg.reduce((a, r) => a + r.count, 0) || 1;
-  const RORDER = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal"];
+  const RORDER = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal", "Unassigned"];
   const activeRoles = m.roleAgg.filter(r => r.count > 0).slice().sort((a, b) => RORDER.indexOf(a.role) - RORDER.indexOf(b.role));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -2080,7 +2081,7 @@ function mergeOutlook(activity, events, filter) {
   const rows = [];
   gated.forEach(e => {
     let hat;
-    if (rules.length) { hat = outlookHatFor(e, rules) || filter.fallback || ""; if (!hat) return; } // rule mode: skip unmatched unless a fallback hat is set
+    if (rules.length) { hat = outlookHatFor(e, rules); if (!hat) hat = (filter.fallback === undefined ? "Unassigned" : filter.fallback); if (!hat) return; } // rule mode: unmatched → Unassigned by default (or a chosen fallback / Skip)
     else hat = filter.role || "PhD"; // single-hat mode
     const a = outlookToActivity(e, hat);
     if (a.date) rows.push(a);
@@ -2237,7 +2238,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
         <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: AUB2 }}>{lang === "th" ? "แยกหมวกอัตโนมัติ (คำในหัวข้อ → หมวก)" : "Auto-assign hat (title keyword → hat)"}</span>
-            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "BSSC PGTA" }, { match: "phd, estate, readiness, mycampus, interview, huddle, board, catch, governance", hat: "PhD" }] })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
+            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "BSSC PGTA" }, { match: "phd, estate, readiness, mycampus, interview, huddle, board, catch, governance", hat: "PhD" }], fallback: "Unassigned" })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
           </div>
           {(outlookCfg.rules || []).length === 0 && <div style={{ fontSize: 10.5, color: GREY }}>{lang === "th" ? "ไม่มีกฎ = ใช้หมวกเดียว (หมวกที่เลือกด้านบน) กับทุกรายการ" : "No rules = one hat (the one selected above) for everything."}</div>}
           {(outlookCfg.rules || []).map((r, i) => (
@@ -2252,7 +2253,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
               <button onClick={() => setOutlookCfg({ rules: [...(outlookCfg.rules || []), { match: "", hat: "PhD" }] })} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>{lang === "th" ? "＋ เพิ่มกฎ" : "＋ Add rule"}</button>
               <label style={{ fontSize: 11, color: AUB2, display: "flex", alignItems: "center", gap: 5 }}>{lang === "th" ? "รายการที่ไม่ตรงกฎ →" : "Unmatched →"}
-                <select value={outlookCfg.fallback || ""} onChange={e => setOutlookCfg({ fallback: e.target.value })} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>
+                <select value={outlookCfg.fallback === undefined ? "Unassigned" : outlookCfg.fallback} onChange={e => setOutlookCfg({ fallback: e.target.value })} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>
                   <option value="">{lang === "th" ? "ข้าม (ไม่นำเข้า)" : "Skip (don't import)"}</option>
                   {ROLES.map(h => <option key={h} value={h}>{roleLab(lang, h)}</option>)}
                 </select>
