@@ -2133,6 +2133,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
     }
     const summary = IMPORT_STORES.filter(k => Array.isArray(parsed[k]) && parsed[k].length).map(k => `${parsed[k].length} ${k}`);
     if (!summary.length) { setPasteMsg({ ok: false, text: lang === "th" ? "ไม่พบรายการที่รู้จัก (เช่น activity, contacts, tasks)" : "No known lists found (e.g. activity, contacts, tasks). Check the keys." }); return; }
+    if (pushUndo) pushUndo();
     setData(d => { const nd = { ...d }; IMPORT_STORES.forEach(k => { if (Array.isArray(parsed[k]) && parsed[k].length) { const items = parsed[k].map(it => (it && typeof it === "object" && !Array.isArray(it)) ? { _a: [], ...it } : it); nd[k] = [...(Array.isArray(nd[k]) ? nd[k] : []), ...items]; } }); return nd; });
     setPasteMsg({ ok: true, text: (lang === "th" ? "เพิ่มแล้ว: " : "Added: ") + summary.join(", ") });
     setPasteText("");
@@ -2148,9 +2149,18 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   const mergeCalEvents = events => {
     const filter = { ...outlookCfg, role };
     const res = mergeOutlook(data.activity, events, filter);
-    if (res.added) setData(d => ({ ...d, activity: [...(d.activity || []), ...res.addRows], meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), role } } }));
+    if (res.added) { if (pushUndo) pushUndo(); setData(d => ({ ...d, activity: [...(d.activity || []), ...res.addRows], meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), role } } })); }
     else setOutlookCfg({ role });
     return res;
+  };
+  // undo an Outlook import: remove every activity row that came from a calendar (id starts "ics-")
+  const removeOutlookItems = () => {
+    const n = (data.activity || []).filter(r => String(r._id || "").startsWith("ics-")).length;
+    if (!n) { setOutMsg({ ok: false, text: lang === "th" ? "ไม่มีรายการที่ดึงจาก Outlook" : "No Outlook-imported items to remove." }); return; }
+    if (!window.confirm(lang === "th" ? `ลบ ${n} รายการที่ดึงจาก Outlook? (ย้อนได้ด้วยปุ่ม ⤺ Undo)` : `Remove ${n} Outlook-imported items? (undoable with ⤺ Undo)`)) return;
+    if (pushUndo) pushUndo();
+    setData(d => ({ ...d, activity: (d.activity || []).filter(r => !String(r._id || "").startsWith("ics-")) }));
+    setOutMsg({ ok: true, text: lang === "th" ? `ลบ ${n} รายการจาก Outlook แล้ว` : `Removed ${n} Outlook-imported items.` });
   };
   const reportMerge = res => setOutMsg({ ok: true, text: lang === "th" ? `เพิ่ม ${res.added} กิจกรรม (ข้ามซ้ำ ${res.skipped})` : `Added ${res.added} events (skipped ${res.skipped} already imported)` });
   const syncOutlook = async () => {
@@ -2272,6 +2282,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
             {lang === "th" ? "อัปโหลดไฟล์ .ics…" : "Import .ics file…"}
             <input type="file" accept=".ics,text/calendar" onChange={importICSFile} style={{ display: "none" }} />
           </label>
+          <button onClick={removeOutlookItems} title={lang === "th" ? "ลบทุกรายการที่ดึงมาจากปฏิทิน (ย้อนได้)" : "remove everything imported from the calendar (undoable)"} style={{ background: "#fff", color: RED, border: `1px solid ${RED}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 12 }}>↩ {lang === "th" ? "ยกเลิก/ลบที่ดึงมา" : "Undo import"}</button>
           {outMsg && <span style={{ fontSize: 12, fontWeight: 600, color: outMsg.ok ? GREEN : RED }}>{outMsg.ok ? "✓ " : "⚠ "}{outMsg.text}</span>}
         </div>
         <div style={{ fontSize: 10.5, color: GREY, marginTop: 8, lineHeight: 1.5 }}>{outlookEndpoint ? (lang === "th" ? "เชื่อม Worker แล้ว ✓" : "Worker connected ✓") : (lang === "th" ? "ยังไม่ได้เชื่อม Worker — “ซิงค์จาก Outlook” จะใช้ได้เมื่อใส่ URL ใน index.html · “อัปโหลด .ics” ใช้ได้เลย" : "Worker not connected yet — “Sync from Outlook” needs the URL in index.html · “Import .ics file” works right now.")}</div>
