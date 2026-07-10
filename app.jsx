@@ -1221,7 +1221,7 @@ function RoleTagCell({ value, onChange, lang }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", padding: "4px 6px", position: "relative", minHeight: 28 }}>
       {roles.map(r => (
-        <span key={r} style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: roleColor(r), borderRadius: 999, padding: "1px 4px 1px 8px", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+        <span key={r} style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: roleColor(r), borderRadius: 999, padding: "2px 6px 2px 10px", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
           {roleLab(lang, r)}<span onClick={() => remove(r)} title="remove" style={{ cursor: "pointer", opacity: 0.85, fontWeight: 400 }}>×</span>
         </span>
       ))}
@@ -1246,12 +1246,12 @@ function PeopleTagCell({ value, onChange, suggestions, lang }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", padding: "4px 6px", minHeight: 28 }}>
       {people.map(p => (
-        <span key={p} style={{ fontSize: 10, fontWeight: 600, color: AUB, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 999, padding: "1px 4px 1px 8px", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+        <span key={p} style={{ fontSize: 12, fontWeight: 600, color: AUB, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 999, padding: "2px 6px 2px 10px", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
           <span onClick={() => fireSearch(p)} title={lang === "th" ? "คลิกเพื่อค้นหาคนนี้" : "click to search this person"} style={{ cursor: "pointer" }}>{p}</span>
           <span onClick={() => remove(p)} title="remove" style={{ cursor: "pointer", color: GREY }}>×</span>
         </span>
       ))}
-      <input value={txt} onChange={e => setTxt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(txt); } }} onBlur={() => txt.trim() && add(txt)} list={dlId} placeholder={people.length ? "" : (lang === "th" ? "+ ชื่อ" : "+ name")} style={{ border: "none", outline: "none", background: "transparent", fontSize: 11, minWidth: 56, flex: 1, padding: "2px" }} />
+      <input value={txt} onChange={e => setTxt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(txt); } }} onBlur={() => txt.trim() && add(txt)} list={dlId} placeholder={people.length ? "" : (lang === "th" ? "+ ชื่อ" : "+ name")} style={{ border: "none", outline: "none", background: "transparent", fontSize: 12, minWidth: 60, flex: 1, padding: "2px" }} />
       <datalist id={dlId}>{(suggestions || []).map(n => <option key={n} value={n} />)}</datalist>
     </div>
   );
@@ -1267,12 +1267,12 @@ function TagCell({ value, onChange, suggestions, lang }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", padding: "4px 6px", minHeight: 28 }}>
       {tags.map(tg => (
-        <span key={tg} style={{ fontSize: 10, fontWeight: 600, color: AUB2, background: "#EFEAF3", borderRadius: 5, padding: "1px 4px 1px 7px", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+        <span key={tg} style={{ fontSize: 12, fontWeight: 600, color: AUB2, background: "#EFEAF3", borderRadius: 6, padding: "2px 6px 2px 9px", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
           <span onClick={() => fireSearch(tg)} title={lang === "th" ? "คลิกเพื่อค้นหาแท็กนี้" : "click to search this tag"} style={{ cursor: "pointer" }}>{tg}</span>
           <span onClick={() => remove(tg)} title="remove" style={{ cursor: "pointer", color: GREY }}>×</span>
         </span>
       ))}
-      <input value={txt} onChange={e => setTxt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(txt); } }} onBlur={() => txt.trim() && add(txt)} list={dlId} placeholder={tags.length ? "" : (lang === "th" ? "+ แท็ก" : "+ tag")} style={{ border: "none", outline: "none", background: "transparent", fontSize: 11, minWidth: 46, flex: 1, padding: "2px" }} />
+      <input value={txt} onChange={e => setTxt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(txt); } }} onBlur={() => txt.trim() && add(txt)} list={dlId} placeholder={tags.length ? "" : (lang === "th" ? "+ แท็ก" : "+ tag")} style={{ border: "none", outline: "none", background: "transparent", fontSize: 12, minWidth: 50, flex: 1, padding: "2px" }} />
       <datalist id={dlId}>{(suggestions || []).map(n => <option key={n} value={n} />)}</datalist>
     </div>
   );
