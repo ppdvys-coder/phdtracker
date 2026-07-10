@@ -243,7 +243,7 @@ const cols = {
     {k:"date",l:"Date",w:104},{k:"category",l:"Category",w:140,type:"select",opts:ACT_CATS},
     {k:"activity",l:"Activity / record",w:230},{k:"linked",l:"Linked to (person)",w:160,type:"people"},
     {k:"detail",l:"Summary / notes",w:280},{k:"obsidian",l:"Obsidian note",w:180},
-    {k:"output",l:"Other output / link",w:180},{k:"hours",l:"Hours",w:66,type:"number"},{k:"tag",l:"Tag",w:110},
+    {k:"output",l:"Other output / link",w:180},{k:"hours",l:"Hours",w:66,type:"number"},{k:"tag",l:"Tag",w:150,type:"tags"},
     {k:"role",l:"Role (job)",w:120,type:"roles"},
     {k:"acttype",l:"Activity type",w:160,type:"select",opts:ACTIVITY_TYPES},
     {k:"evidence",l:"Evidence",w:160},{k:"reflection",l:"Reflection",w:220},{k:"impact",l:"Impact",w:200},
@@ -261,7 +261,7 @@ const cols = {
   ],
   sources: [
     {k:"title",l:"Title",w:280},{k:"authors",l:"Author(s)",w:160},{k:"stype",l:"Type",w:130,type:"select",opts:["Journal article","Book","Report","Conference","Thesis","Web","Standard","Other"]},
-    {k:"year",l:"Year",w:70},{k:"link",l:"Link / DOI",w:180},{k:"role",l:"Hat",w:100,type:"roles"},{k:"tags",l:"Tags / themes",w:160},{k:"notes",l:"Notes / annotation",w:260},
+    {k:"year",l:"Year",w:70},{k:"link",l:"Link / DOI",w:180},{k:"role",l:"Hat",w:100,type:"roles"},{k:"tags",l:"Tags / themes",w:170,type:"tags"},{k:"notes",l:"Notes / annotation",w:260},
   ],
   outputs: [
     {k:"title",l:"Output",w:280},{k:"otype",l:"Type",w:150,type:"select",opts:["Paper","Presentation","Slide deck","Teaching material","Report","Poster","Dataset","Software / tool","Blog","Other"]},
@@ -284,34 +284,34 @@ const cols = {
     {k:"title",l:"Title",w:240},{k:"date",l:"Date",w:104},{k:"ay",l:"Academic year",w:110},{k:"institution",l:"Institution",w:150},
     {k:"programme",l:"Programme / module",w:150},{k:"type",l:"Type",w:120,type:"select",opts:TS_TYPES},{k:"role",l:"My role",w:120,type:"select",opts:TS_ROLES},
     {k:"topic",l:"Topic / theme",w:200},{k:"nstudents",l:"No. students",w:90,type:"number"},{k:"hours",l:"Duration (h)",w:90,type:"number"},
-    {k:"evidence",l:"Evidence link",w:170},{k:"note",l:"Reflection / note",w:220},{k:"tags",l:"Tags",w:120},
+    {k:"evidence",l:"Evidence link",w:170},{k:"note",l:"Reflection / note",w:220},{k:"tags",l:"Tags",w:150,type:"tags"},
     {k:"privacy",l:"Privacy level",w:150,type:"select",opts:PRIVACY_L},{k:"usefor",l:"Use for",w:150,type:"select",opts:USE_FOR},
   ],
   guestLectures: [
     {k:"title",l:"Title",w:240},{k:"date",l:"Date",w:104},{k:"ay",l:"Academic year",w:110},{k:"institution",l:"Host institution",w:170},
     {k:"programme",l:"Programme / module",w:150},{k:"type",l:"Type",w:130,type:"select",opts:GL_TYPES},{k:"role",l:"My role",w:130,type:"select",opts:GL_ROLES},
     {k:"topic",l:"Topic / theme",w:200},{k:"audience",l:"Audience",w:150},{k:"nstudents",l:"Audience size",w:100,type:"number"},
-    {k:"evidence",l:"Evidence link",w:170},{k:"cvwording",l:"Possible CV wording",w:260},{k:"note",l:"Reflection / note",w:200},{k:"tags",l:"Tags",w:120},
+    {k:"evidence",l:"Evidence link",w:170},{k:"cvwording",l:"Possible CV wording",w:260},{k:"note",l:"Reflection / note",w:200},{k:"tags",l:"Tags",w:150,type:"tags"},
     {k:"privacy",l:"Privacy level",w:150,type:"select",opts:PRIVACY_L},{k:"usefor",l:"Use for",w:150,type:"select",opts:USE_FOR},
   ],
   supervision: [
     {k:"title",l:"Student (name / ID)",w:220},{k:"level",l:"Level",w:130,type:"select",opts:SUP_LEVELS},{k:"programme",l:"Programme",w:180},
     {k:"institution",l:"Institution",w:160},{k:"ay",l:"Academic year",w:110},{k:"topic",l:"Supervision topic / theme",w:240},
     {k:"role",l:"My role",w:150,type:"select",opts:SUP_ROLES},{k:"status",l:"Status",w:120,type:"select",opts:SUP_STATUS},{k:"outcome",l:"Outcome",w:160},
-    {k:"nstudents",l:"No. students",w:90,type:"number"},{k:"evidence",l:"Evidence link",w:160},{k:"note",l:"Reflection / note",w:200},{k:"tags",l:"Tags",w:120},
+    {k:"nstudents",l:"No. students",w:90,type:"number"},{k:"evidence",l:"Evidence link",w:160},{k:"note",l:"Reflection / note",w:200},{k:"tags",l:"Tags",w:150,type:"tags"},
     {k:"privacy",l:"Privacy level",w:160,type:"select",opts:PRIVACY_L},{k:"usefor",l:"Use for",w:150,type:"select",opts:USE_FOR},
   ],
   marking: [
     {k:"title",l:"Assessment",w:220},{k:"date",l:"Date",w:104},{k:"ay",l:"Academic year",w:110},{k:"institution",l:"Institution",w:150},
     {k:"programme",l:"Programme / module",w:150},{k:"type",l:"Assessment type",w:140,type:"select",opts:MK_TYPES},{k:"role",l:"My role",w:130,type:"select",opts:MK_ROLES},
     {k:"nstudents",l:"No. scripts",w:90,type:"number"},{k:"hours",l:"Duration (h)",w:90,type:"number"},{k:"feedback",l:"Feedback notes",w:220},{k:"moderation",l:"Moderation notes",w:200},
-    {k:"evidence",l:"Evidence link",w:160},{k:"note",l:"Reflection / note",w:180},{k:"tags",l:"Tags",w:120},
+    {k:"evidence",l:"Evidence link",w:160},{k:"note",l:"Reflection / note",w:180},{k:"tags",l:"Tags",w:150,type:"tags"},
     {k:"privacy",l:"Privacy level",w:160,type:"select",opts:PRIVACY_L},{k:"usefor",l:"Use for",w:150,type:"select",opts:USE_FOR},
   ],
   teachingEvidence: [
     {k:"title",l:"Title",w:240},{k:"date",l:"Date",w:104},{k:"ay",l:"Academic year",w:110},{k:"type",l:"Type",w:160,type:"select",opts:TE_TYPES},
     {k:"programme",l:"Programme / module",w:150},{k:"evidence",l:"Evidence link / location",w:220},{k:"related",l:"Related record",w:180},
-    {k:"note",l:"Reflection / note",w:220},{k:"tags",l:"Tags",w:120},{k:"privacy",l:"Privacy level",w:160,type:"select",opts:PRIVACY_L},{k:"usefor",l:"Use for",w:150,type:"select",opts:USE_FOR},
+    {k:"note",l:"Reflection / note",w:220},{k:"tags",l:"Tags",w:150,type:"tags"},{k:"privacy",l:"Privacy level",w:160,type:"select",opts:PRIVACY_L},{k:"usefor",l:"Use for",w:150,type:"select",opts:USE_FOR},
   ],
 };
 
@@ -1257,6 +1257,27 @@ function PeopleTagCell({ value, onChange, suggestions, lang }) {
   );
 }
 
+// Notion-style free tag cell: chips you add by typing (any tag, autocompletes from existing tags); click to search
+function TagCell({ value, onChange, suggestions, lang }) {
+  const [txt, setTxt] = useState("");
+  const dlId = React.useRef("tag" + Math.random().toString(36).slice(2, 8)).current;
+  const tags = String(value || "").split(/\s*[;,]\s*/).map(s => s.trim()).filter(Boolean);
+  const add = t => { const n = (t || "").trim(); if (n && !tags.includes(n)) onChange([...tags, n].join(", ")); setTxt(""); };
+  const remove = t => onChange(tags.filter(x => x !== t).join(", "));
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", padding: "4px 6px", minHeight: 28 }}>
+      {tags.map(tg => (
+        <span key={tg} style={{ fontSize: 10, fontWeight: 600, color: AUB2, background: "#EFEAF3", borderRadius: 5, padding: "1px 4px 1px 7px", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+          <span onClick={() => fireSearch(tg)} title={lang === "th" ? "คลิกเพื่อค้นหาแท็กนี้" : "click to search this tag"} style={{ cursor: "pointer" }}>{tg}</span>
+          <span onClick={() => remove(tg)} title="remove" style={{ cursor: "pointer", color: GREY }}>×</span>
+        </span>
+      ))}
+      <input value={txt} onChange={e => setTxt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(txt); } }} onBlur={() => txt.trim() && add(txt)} list={dlId} placeholder={tags.length ? "" : (lang === "th" ? "+ แท็ก" : "+ tag")} style={{ border: "none", outline: "none", background: "transparent", fontSize: 11, minWidth: 46, flex: 1, padding: "2px" }} />
+      <datalist id={dlId}>{(suggestions || []).map(n => <option key={n} value={n} />)}</datalist>
+    </div>
+  );
+}
+
 // date cell: type freely (also supports partial like 2024-01) OR pick from a calendar via 📅
 const DATE_COL_KEYS = ["date", "start", "end", "pStart", "pEnd", "aStart", "aEnd", "due", "deadline", "opens", "submitted", "captured"];
 const isDateColumn = c => c.type ? false : (DATE_COL_KEYS.includes(c.k) || ((c.k === "first" || c.k === "last") && /contact/i.test(c.l || "")));
@@ -1326,6 +1347,8 @@ function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortK
                         <RoleTagCell value={r[c.k]} onChange={v => update(tabKey, i, c.k, v)} lang={lang} />
                       ) : c.type === "people" ? (
                         <PeopleTagCell value={r[c.k]} onChange={v => update(tabKey, i, c.k, v)} suggestions={(data.contacts || []).map(x => x.name).filter(Boolean)} lang={lang} />
+                      ) : c.type === "tags" ? (
+                        <TagCell value={r[c.k]} onChange={v => update(tabKey, i, c.k, v)} suggestions={[...new Set(rows.flatMap(x => String(x[c.k] || "").split(/\s*[;,]\s*/).map(s => s.trim()).filter(Boolean)))]} lang={lang} />
                       ) : c.type === "select" ? (
                         <select value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, cursor: "pointer" }}><option value=""></option>{c.opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
                       ) : c.type === "number" ? (
@@ -1388,7 +1411,7 @@ function ActivityLog({ data, update, addRow, delRow, exportCSV, setRow, addRowWi
       {view === "list" && <TableTab tabKey="activity" data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} sortKey="date" sortDir="desc" />}
       {view === "calendar" && <CalendarView indexed={shown} full={full} cal={cal} setCal={setCal} openEdit={openEdit} openNew={openNew} lang={lang} />}
       {view === "folder" && <FolderView indexed={shown} openEdit={openEdit} openNew={openNew} vault={vault} lang={lang} />}
-      {editing && <EntryModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} vault={vault} contactNames={contactNames} lang={lang} />}
+      {editing && <EntryModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} vault={vault} contactNames={contactNames} tagSuggestions={[...new Set((data.activity || []).flatMap(x => String(x.tag || "").split(/[;,]/).map(s => s.trim()).filter(Boolean)))]} lang={lang} />}
     </div>
   );
 }
@@ -1472,7 +1495,7 @@ function FolderView({ indexed, openEdit, openNew, vault, lang }) {
   );
 }
 
-function EntryModal({ editing, setField, save, remove, cancel, vault, contactNames, lang }) {
+function EntryModal({ editing, setField, save, remove, cancel, vault, contactNames, tagSuggestions, lang }) {
   const d = editing.draft; const href = obsHref(d.obsidian, vault); const L = k => t(lang, k);
   return (
     <div onClick={cancel} style={{ position: "fixed", inset: 0, background: "rgba(20,12,30,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 50 }}>
@@ -1486,6 +1509,7 @@ function EntryModal({ editing, setField, save, remove, cancel, vault, contactNam
                 <label style={{ fontSize: 11, fontWeight: 700, color: AUB2, display: "block", marginBottom: 3 }}>{colLab(lang, f.l)}{assumed && <span style={{ color: RED }}> ●</span>}</label>
                 {f.type === "roles" ? <div style={{ border: `1px solid ${BORDER}`, borderRadius: 6 }}><RoleTagCell value={d[f.k]} onChange={v => setField(f.k, v)} lang={lang} /></div>
                   : f.type === "people" ? <div style={{ border: `1px solid ${BORDER}`, borderRadius: 6 }}><PeopleTagCell value={d[f.k]} onChange={v => setField(f.k, v)} suggestions={contactNames} lang={lang} /></div>
+                  : f.type === "tags" ? <div style={{ border: `1px solid ${BORDER}`, borderRadius: 6 }}><TagCell value={d[f.k]} onChange={v => setField(f.k, v)} suggestions={tagSuggestions || []} lang={lang} /></div>
                   : f.type === "select" ? <select value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} style={st}><option value=""></option>{f.opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
                   : f.type === "number" ? <input type="number" value={d[f.k] || 0} onChange={e => setField(f.k, e.target.value)} style={st} />
                   : f.k === "detail" ? <textarea rows={3} value={d[f.k] || ""} onChange={e => setField(f.k, e.target.value)} style={{ ...st, resize: "vertical" }} />
@@ -1697,7 +1721,7 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
         )}
         {keys.length === 0 && undated.length === 0 && <div style={{ fontSize: 12, color: GREY, textAlign: "center", padding: 30 }}>—</div>}
       </div>
-      {editing && <EntryModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} vault={vault} contactNames={contactNames} lang={lang} />}
+      {editing && <EntryModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} vault={vault} contactNames={contactNames} tagSuggestions={[...new Set((data.activity || []).flatMap(x => String(x.tag || "").split(/[;,]/).map(s => s.trim()).filter(Boolean)))]} lang={lang} />}
     </div>
   );
 }
