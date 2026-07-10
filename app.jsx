@@ -2254,8 +2254,10 @@ function outlookHatFor(ev, rules) {
 function mergeOutlook(activity, events, filter) {
   const gated = filterOutlookEvents(events, filter);
   const rules = Array.isArray(filter.rules) ? filter.rules.filter(r => (r.match || "").trim()) : [];
+  const dismissed = new Set(filter.dismissed || []); // events the user reviewed and discarded — never re-import
   const rows = [];
   gated.forEach(e => {
+    if (dismissed.has(e.uid)) return;
     let hat;
     if (rules.length) { hat = outlookHatFor(e, rules); if (!hat) hat = (filter.fallback === undefined ? "Unassigned" : filter.fallback); if (!hat) return; } // rule mode: unmatched → Unassigned by default (or a chosen fallback / Skip)
     else hat = filter.role || "PhD"; // single-hat mode
@@ -2319,16 +2321,10 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   // Filter + auto-on-open settings live in meta.outlook so the auto-sync (in App) reuses them.
   const [outMsg, setOutMsg] = useState(null);
   const [outBusy, setOutBusy] = useState(false);
+  const [review, setReview] = useState(null); // [{ev, keep, role}] while the review window is open
   const outlookEndpoint = (typeof window !== "undefined" && window.OUTLOOK_ENDPOINT) || "";
   const outlookCfg = (data.meta && data.meta.outlook) || {};
   const setOutlookCfg = patch => setData(d => ({ ...d, meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), ...patch } } }));
-  const mergeCalEvents = events => {
-    const filter = { ...outlookCfg, role };
-    const res = mergeOutlook(data.activity, events, filter);
-    if (res.added) { if (pushUndo) pushUndo(); setData(d => ({ ...d, activity: [...(d.activity || []), ...res.addRows], meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), role } } })); }
-    else setOutlookCfg({ role });
-    return res;
-  };
   // undo an Outlook import: remove every activity row that came from a calendar (id starts "ics-")
   const removeOutlookItems = () => {
     const n = (data.activity || []).filter(r => String(r._id || "").startsWith("ics-")).length;
@@ -2338,22 +2334,40 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
     setData(d => ({ ...d, activity: (d.activity || []).filter(r => !String(r._id || "").startsWith("ics-")) }));
     setOutMsg({ ok: true, text: lang === "th" ? `ลบ ${n} รายการจาก Outlook แล้ว` : `Removed ${n} Outlook-imported items.` });
   };
-  const reportMerge = res => setOutMsg({ ok: true, text: lang === "th" ? `เพิ่ม ${res.added} กิจกรรม (ข้ามซ้ำ ${res.skipped})` : `Added ${res.added} events (skipped ${res.skipped} already imported)` });
+  // gather NEW events (not already imported, not previously discarded) with a proposed role → open the review window
+  const openReview = events => {
+    const haveIds = new Set((data.activity || []).map(r => r._id).filter(Boolean));
+    const dismissed = new Set(outlookCfg.dismissed || []);
+    const rules = (outlookCfg.rules || []).filter(r => (r.match || "").trim());
+    const propose = ev => rules.length ? (outlookHatFor(ev, rules) || (outlookCfg.fallback === undefined ? "Unassigned" : outlookCfg.fallback) || "Unassigned") : (outlookCfg.role || role || "PhD");
+    const news = filterOutlookEvents(events, outlookCfg).filter(e => !haveIds.has("ics-" + e.uid) && !dismissed.has(e.uid));
+    if (!news.length) { setOutMsg({ ok: true, text: lang === "th" ? "ไม่มีกิจกรรมใหม่ให้ตรวจ (ดึงครบแล้ว)" : "No new events to review (all up to date)." }); return; }
+    setOutMsg(null);
+    setReview(news.map(e => ({ ev: e, keep: true, role: propose(e) })));
+  };
   const syncOutlook = async () => {
     if (!outlookEndpoint) { setOutMsg({ ok: false, text: lang === "th" ? "ยังไม่ได้ตั้งค่า Worker — ใส่ Worker URL ใน index.html หรือใช้ ‘อัปโหลด .ics’" : "No Worker URL set — add it in index.html, or use ‘Import .ics file’." }); return; }
     setOutBusy(true); setOutMsg(null);
-    try {
-      const events = await fetchOutlookEvents(outlookEndpoint);
-      if (!events.length) setOutMsg({ ok: false, text: lang === "th" ? "ไม่พบกิจกรรมในปฏิทิน" : "No events found in the calendar." });
-      else reportMerge(mergeCalEvents(events));
-    } catch (e) { setOutMsg({ ok: false, text: (lang === "th" ? "ซิงค์ไม่สำเร็จ: " : "Sync failed: ") + e.message }); }
+    try { const events = await fetchOutlookEvents(outlookEndpoint); openReview(events); }
+    catch (e) { setOutMsg({ ok: false, text: (lang === "th" ? "ซิงค์ไม่สำเร็จ: " : "Sync failed: ") + e.message }); }
     setOutBusy(false);
   };
   const importICSFile = e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const rd = new FileReader();
-    rd.onload = () => { try { const events = parseICS(String(rd.result)); if (!events.length) setOutMsg({ ok: false, text: lang === "th" ? "ไม่พบกิจกรรมในไฟล์" : "No events found in that file." }); else reportMerge(mergeCalEvents(events)); } catch (err) { setOutMsg({ ok: false, text: lang === "th" ? "อ่านไฟล์ .ics ไม่ได้" : "Couldn't read that .ics file." }); } };
+    rd.onload = () => { try { const events = parseICS(String(rd.result)); if (!events.length) setOutMsg({ ok: false, text: lang === "th" ? "ไม่พบกิจกรรมในไฟล์" : "No events found in that file." }); else openReview(events); } catch (err) { setOutMsg({ ok: false, text: lang === "th" ? "อ่านไฟล์ .ics ไม่ได้" : "Couldn't read that .ics file." }); } };
     rd.readAsText(f); e.target.value = "";
+  };
+  const setReviewItem = (idx, patch) => setReview(rv => rv.map((it, i) => i === idx ? { ...it, ...patch } : it));
+  const confirmReview = () => {
+    const toImport = review.filter(i => i.keep);
+    const toDismiss = review.filter(i => !i.keep).map(i => i.ev.uid);
+    const rows = toImport.map(i => outlookToActivity(i.ev, i.role));
+    if (pushUndo) pushUndo();
+    const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
+    setData(d => ({ ...d, activity: [...(d.activity || []), ...rows], meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), role, dismissed: [...new Set([...(((d.meta && d.meta.outlook) || {}).dismissed || []), ...toDismiss])], lastImport: nowStr } } }));
+    setReview(null);
+    setOutMsg({ ok: true, text: lang === "th" ? `นำเข้า ${toImport.length} · คัดทิ้ง ${toDismiss.length}` : `Imported ${toImport.length} · discarded ${toDismiss.length}` });
   };
 
   return (
@@ -2461,8 +2475,39 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
           <button onClick={removeOutlookItems} title={lang === "th" ? "ลบทุกรายการที่ดึงมาจากปฏิทิน (ย้อนได้)" : "remove everything imported from the calendar (undoable)"} style={{ background: "#fff", color: RED, border: `1px solid ${RED}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 12 }}>↩ {lang === "th" ? "ยกเลิก/ลบที่ดึงมา" : "Undo import"}</button>
           {outMsg && <span style={{ fontSize: 12, fontWeight: 600, color: outMsg.ok ? GREEN : RED }}>{outMsg.ok ? "✓ " : "⚠ "}{outMsg.text}</span>}
         </div>
-        <div style={{ fontSize: 10.5, color: GREY, marginTop: 8, lineHeight: 1.5 }}>{outlookEndpoint ? (lang === "th" ? "เชื่อม Worker แล้ว ✓" : "Worker connected ✓") : (lang === "th" ? "ยังไม่ได้เชื่อม Worker — “ซิงค์จาก Outlook” จะใช้ได้เมื่อใส่ URL ใน index.html · “อัปโหลด .ics” ใช้ได้เลย" : "Worker not connected yet — “Sync from Outlook” needs the URL in index.html · “Import .ics file” works right now.")}</div>
+        <div style={{ fontSize: 10.5, color: GREY, marginTop: 8, lineHeight: 1.5 }}>{outlookEndpoint ? (lang === "th" ? "เชื่อม Worker แล้ว ✓ · กด “ซิงค์” แล้วจะเปิดหน้าตรวจก่อนนำเข้า" : "Worker connected ✓ · Sync opens a review window before importing") : (lang === "th" ? "ยังไม่ได้เชื่อม Worker — “ซิงค์จาก Outlook” จะใช้ได้เมื่อใส่ URL ใน index.html · “อัปโหลด .ics” ใช้ได้เลย" : "Worker not connected yet — “Sync from Outlook” needs the URL in index.html · “Import .ics file” works right now.")}</div>
+        {outlookCfg.lastImport && <div style={{ fontSize: 10.5, color: AUB2, marginTop: 3 }}>🕘 {lang === "th" ? "ดึงล่าสุด" : "last import"}: {outlookCfg.lastImport}{(outlookCfg.dismissed || []).length ? ` · ${lang === "th" ? "คัดทิ้งไว้" : "discarded"} ${(outlookCfg.dismissed || []).length}` : ""}</div>}
       </div>
+
+      {review && (
+        <div onClick={() => setReview(null)} style={{ position: "fixed", inset: 0, background: "rgba(20,12,30,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 60 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 660, maxWidth: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}>
+            <div style={{ background: AUB, color: "#fff", padding: "12px 16px", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>📅 {lang === "th" ? "ตรวจก่อนนำเข้า" : "Review before import"} · {review.filter(i => i.keep).length}/{review.length}</span>
+              <button onClick={() => setReview(null)} style={{ border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ padding: "8px 12px", display: "flex", gap: 8, alignItems: "center", borderBottom: `1px solid ${BORDER}`, flexWrap: "wrap" }}>
+              <button onClick={() => setReview(rv => rv.map(it => ({ ...it, keep: true })))} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>{lang === "th" ? "เลือกทั้งหมด" : "Select all"}</button>
+              <button onClick={() => setReview(rv => rv.map(it => ({ ...it, keep: false })))} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>{lang === "th" ? "ไม่เลือกเลย" : "Deselect all"}</button>
+              <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{lang === "th" ? "ติ๊ก = นำเข้า · ไม่ติ๊ก = คัดทิ้ง (จะไม่ถามอีก)" : "checked = import · unchecked = discard (won't ask again)"}</span>
+            </div>
+            <div style={{ padding: "2px 8px", overflowY: "auto", flex: 1 }}>
+              {review.map((it, idx) => (
+                <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center", padding: "7px 6px", borderBottom: `1px solid ${BORDER}`, fontSize: 12, opacity: it.keep ? 1 : 0.45 }}>
+                  <input type="checkbox" checked={it.keep} onChange={e => setReviewItem(idx, { keep: e.target.checked })} />
+                  <span style={{ width: 82, color: GREY, flex: "0 0 auto" }}>{it.ev.date}</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.ev.summary}{it.ev.busy && it.ev.busy !== "BUSY" ? <span style={{ fontSize: 9, color: AMBER }}> · {it.ev.busy}</span> : null}</span>
+                  <select value={it.role} onChange={e => setReviewItem(idx, { role: e.target.value })} disabled={!it.keep} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 11, cursor: "pointer", flex: "0 0 auto" }}>{ROLES.map(rr => <option key={rr} value={rr}>{roleLab(lang, rr)}</option>)}</select>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: `1px solid ${BORDER}` }}>
+              <button onClick={confirmReview} style={{ background: AUB, color: "#fff", border: "none", borderRadius: 6, padding: "9px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>{lang === "th" ? `ยืนยัน — นำเข้า ${review.filter(i => i.keep).length} · คัดทิ้ง ${review.filter(i => !i.keep).length}` : `Confirm — import ${review.filter(i => i.keep).length} · discard ${review.filter(i => !i.keep).length}`}</button>
+              <button onClick={() => setReview(null)} style={{ marginLeft: "auto", background: "#fff", color: AUB2, border: `1px solid ${BORDER}`, borderRadius: 6, padding: "9px 14px", cursor: "pointer", fontSize: 13 }}>{lang === "th" ? "ยกเลิก (ไว้ทีหลัง)" : "Cancel (decide later)"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
