@@ -107,10 +107,11 @@ const ACT_COLOR = { "Meeting":"#ED6C02","Interview":"#0277BD","Note":"#455A64","
   "Milestone":"#2E7D32","Other":"#9E9E9E","Uncategorised":"#9E9E9E" };
 
 // ---- Roles (timeline-based) ----
-const ROLES = ["PhD","Chula Lecturer","BSSC Lecturer","BSSC PGTA","Service/Admin","Personal","Unassigned"];
+const ROLES = ["PhD","Estate","Chula Lecturer","BSSC Lecturer","BSSC PGTA","Service/Admin","Personal","Unassigned"];
 const ROLE_META = {
   "Unassigned":{th:"ยังไม่จัดหมวด", c:"#9E9E9E", period:"", start:""},
   "PhD":{th:"ปริญญาเอก", c:"#2B1241", period:"Sep 2023 – present", start:"2023-09-25"},
+  "Estate":{th:"UCL Estates", c:"#1565C0", period:"", start:""},
   "Chula Lecturer":{th:"อาจารย์ จุฬาฯ", c:"#C2185B", period:"Sep 2024 – present", start:"2024-09-01"},
   "BSSC Lecturer":{th:"อาจารย์ BSSC", c:"#00796B", period:"Nov 2025 – present", start:"2025-11-01"},
   "BSSC PGTA":{th:"ผู้ช่วยสอน BSSC (PGTA)", c:"#0277BD", period:"Jan 2025 – present", start:"2025-01-13"},
@@ -1136,7 +1137,7 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   const L = k => t(lang, k);
   const phaseName = p => lang === "th" ? (PHASE_TH[p] || p) : p;
   const totalAct = m.roleAgg.reduce((a, r) => a + r.count, 0) || 1;
-  const RORDER = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal", "Unassigned"];
+  const RORDER = ["PhD", "Estate", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal", "Unassigned"];
   const activeRoles = m.roleAgg.filter(r => r.count > 0).slice().sort((a, b) => RORDER.indexOf(a.role) - RORDER.indexOf(b.role));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -2502,7 +2503,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
         <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: AUB2 }}>{lang === "th" ? "แยกหมวกอัตโนมัติ (คำในหัวข้อ → หมวก)" : "Auto-assign hat (title keyword → hat)"}</span>
-            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "BSSC PGTA" }, { match: "phd, estate, readiness, mycampus, interview, huddle, board, catch, governance", hat: "PhD" }], fallback: "Unassigned" })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
+            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "BSSC PGTA" }, { match: "estate, estates, iwms, mycampus, huddle, facilities, cafm, space, building", hat: "Estate" }, { match: "phd, readiness, supervis, interview, board, catch, governance, transformation", hat: "PhD" }], fallback: "Unassigned" })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
           </div>
           {(outlookCfg.rules || []).length === 0 && <div style={{ fontSize: 10.5, color: GREY }}>{lang === "th" ? "ไม่มีกฎ = ใช้หมวกเดียว (หมวกที่เลือกด้านบน) กับทุกรายการ" : "No rules = one hat (the one selected above) for everything."}</div>}
           {(outlookCfg.rules || []).map((r, i) => (
