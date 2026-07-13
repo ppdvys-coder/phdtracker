@@ -2469,9 +2469,96 @@ function AddSessionModal({ data, setData, pushUndo, onClose, lang }) {
   );
 }
 
+// ---- Thesis workflow guide (separate window) ----
+function WorkflowGuideModal({ onClose, lang }) {
+  const th = lang === "th";
+  const STEPS = [
+    { n: 1, tool: "NVivo", tc: "#7B1FA2", en: "Analyse", th: "วิเคราะห์",
+      enD: "NVivo gives you themes / codes / quotes (the six pillars + the decision-ownership vacuum) as raw material.",
+      thD: "NVivo ได้ธีม / โค้ด / quote (หกเสา + decision-ownership vacuum) ออกมาเป็นวัตถุดิบ",
+      enL: "“the raw material”", thL: "“วัตถุดิบ”" },
+    { n: 2, tool: "Obsidian", tc: "#6B4E8C", en: "Outline & shape the argument", th: "วางโครง / ปั้น argument",
+      enD: "Obsidian (what you already use) — outline each chapter, link ideas, decide how the story is told.",
+      thD: "Obsidian (ที่คุณใช้อยู่) ทำ outline ของบท ลิงก์ไอเดีย จัดว่าจะเล่าเรื่องยังไง",
+      enL: "“this layer is thinking”", thL: "“ชั้นนี้คือ คิด”" },
+    { n: 3, tool: "Word + Zotero", tc: "#1565C0", en: "Write the actual manuscript", th: "เขียนตัวเล่มจริง",
+      enD: "Take the outline from Obsidian and write it into prose in Word, citing with Zotero as you type.",
+      thD: "เอา outline จาก Obsidian มาเขียนเป็นร้อยแก้วใน Word อ้างอิงด้วย Zotero ระหว่างพิมพ์",
+      enL: "“the real document lives here”", thL: "“เอกสารจริงอยู่ตรงนี้”" },
+    { n: 4, tool: "Dashboard · Thesis tab", tc: AUB, en: "Track", th: "ติดตาม",
+      enD: "After each session, update the word count / chapter status here — it tells you the pace, whether you'll make the deadline.",
+      thD: "แดชบอร์ด (แท็บ Thesis) จบ session ก็มาอัปเดตจำนวนคำ / สถานะบท แล้วมันบอก pace ว่าทันวันส่งไหม",
+      enL: "“the control room”", thL: "“ห้องควบคุม”" },
+  ];
+  const LOOP = th
+    ? ["โครงใน Obsidian", "ร่างเละ ๆ ใน Word", "จด session ในแดชบอร์ด", "กลับมาแก้ (revise)", "ส่งอาจารย์ด้วย Track Changes", "รับคอมเมนต์มาปรับ", "กดบทเป็น ✅ Done"]
+    : ["Outline in Obsidian", "Rough draft in Word", "Log the session in the dashboard", "Revise", "Send to supervisor with Track Changes", "Fold in the comments", "Mark the chapter ✅ Done"];
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 640, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", padding: 22, boxShadow: "0 18px 60px rgba(0,0,0,.35)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: AUB }}>🧭 {th ? "ภาพรวม workflow" : "Workflow overview"}</div>
+          <button onClick={onClose} style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer", color: GREY, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ fontSize: 12.5, color: GREY, marginBottom: 16 }}>{th ? "แต่ละเครื่องมือทำหน้าที่ของมัน" : "Each tool has its own job."}</div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+          {STEPS.map(s => (
+            <div key={s.n} style={{ display: "flex", gap: 12, background: OFF, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ width: 30, height: 30, flex: "0 0 auto", borderRadius: 999, background: s.tc, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800 }}>{s.n}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: AUB }}>{th ? s.th : s.en}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: s.tc, borderRadius: 5, padding: "2px 8px" }}>{s.tool}</span>
+                  <span style={{ fontSize: 11, fontStyle: "italic", color: AUB2 }}>{th ? s.thL : s.enL}</span>
+                </div>
+                <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.5 }}>{th ? s.thD : s.enD}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: CARD, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 3 }}>🔁 {th ? "วนลูปต่อบท (นี่คือหัวใจ)" : "The per-chapter loop (this is the heart of it)"}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8 }}>
+            {LOOP.map((step, i) => (
+              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: AUB, background: "#fff", border: `1px solid ${AUB2}`, borderRadius: 999, padding: "4px 11px" }}>{step}</span>
+                {i < LOOP.length - 1 && <span style={{ color: AUB2, fontSize: 13 }}>→</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+          <div style={{ flex: "1 1 240px", background: OFF, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: AUB, marginBottom: 4 }}>💾 {th ? "สำรองข้อมูล" : "Backups"}</div>
+            <div style={{ fontSize: 12, color: INK, lineHeight: 1.55 }}>
+              {th ? "ตัวเล่มไว้บน OneDrive (มี version history อัตโนมัติ)" : "Manuscript on OneDrive (automatic version history)."}<br />
+              {th ? "ตัวแดชบอร์ดใช้ปุ่ม JSON backup ในแท็บ Add" : "Dashboard via the JSON backup button in the Add tab."}
+            </div>
+          </div>
+          <div style={{ flex: "1 1 240px", background: "#FFF7E6", border: `1px solid ${AMBER}`, borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#8a5a00", marginBottom: 4 }}>⚠️ {th ? "จุดที่คนมักพลาด" : "The common trap"}</div>
+            <div style={{ fontSize: 12, color: "#7a5200", lineHeight: 1.55 }}>
+              {th ? "เขียนไปเกลาไป จนไม่คืบ — ให้แยก “ร่าง” (ขั้น 3) กับ “แก้” (ในลูป) ออกจากกันชัด ๆ" : "Editing while you draft until you stall — keep “drafting” (step 3) and “revising” (in the loop) clearly separate."}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ border: "none", background: AUB, color: "#fff", borderRadius: 7, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>{th ? "เข้าใจแล้ว" : "Got it"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ThesisTab({ data, setData, update, delRow, pushUndo, lang }) {
   const th = lang === "th";
   const [showSession, setShowSession] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const chapters = data.thesis || [];
   const sessions = data.writingSessions || [];
   const statLab = s => th ? (THESIS_STATUS_TH[s] || s) : s;
@@ -2510,8 +2597,13 @@ function ThesisTab({ data, setData, update, delRow, pushUndo, lang }) {
 
   return (
     <div>
-      <div style={{ fontSize: 15, fontWeight: 800, color: AUB, marginBottom: 2 }}>📖 {th ? "การเขียนเล่มวิทยานิพนธ์" : "Thesis writing"}</div>
-      <div style={{ fontSize: 12, color: GREY, marginBottom: 16 }}>{th ? "ติดตามความคืบหน้าแต่ละบท จำนวนคำ และรอบการเขียน" : "Track each chapter, its word count, and every writing session."}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: AUB, marginBottom: 2 }}>📖 {th ? "การเขียนเล่มวิทยานิพนธ์" : "Thesis writing"}</div>
+          <div style={{ fontSize: 12, color: GREY, marginBottom: 16 }}>{th ? "ติดตามความคืบหน้าแต่ละบท จำนวนคำ และรอบการเขียน" : "Track each chapter, its word count, and every writing session."}</div>
+        </div>
+        <button onClick={() => setShowGuide(true)} style={{ border: `1px solid ${AUB}`, background: "#fff", color: AUB, borderRadius: 7, padding: "6px 13px", cursor: "pointer", fontSize: 12, fontWeight: 700, flex: "0 0 auto" }}>🧭 {th ? "ภาพรวม workflow" : "Workflow"}</button>
+      </div>
 
       {/* B) dual progress */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
@@ -2601,6 +2693,7 @@ function ThesisTab({ data, setData, update, delRow, pushUndo, lang }) {
       </div>
 
       {showSession && <AddSessionModal data={data} setData={setData} pushUndo={pushUndo} onClose={() => setShowSession(false)} lang={lang} />}
+      {showGuide && <WorkflowGuideModal onClose={() => setShowGuide(false)} lang={lang} />}
     </div>
   );
 }
