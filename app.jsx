@@ -100,6 +100,13 @@ const STAT_COLOR = { "Completed":GREEN,"In progress":AMBER,"Not started":GREY,"B
   "Drafting":GREY,"Outline":GREY,"Planned":GREY,"Revisions":AMBER,"Rejected":RED,"Yes":AMBER,"No":GREY,
   "Done":GREEN,"Awaiting":AMBER,"New":GREY,"Exploring":AMBER,"Parked":GREY,"Using":GREEN,"Dropped":RED,"Active":GREEN,"On hold":AMBER };
 
+// ---- Thesis writing ----
+const THESIS_STATUS = ["Not started","Outlining","Drafting","Revising","Done"];
+const THESIS_STATUS_TH = {"Not started":"ยังไม่เริ่ม","Outlining":"ร่างโครง","Drafting":"เขียนร่าง","Revising":"แก้ไข","Done":"เสร็จ"};
+const THESIS_WEIGHT = { "Not started":0, "Outlining":0.15, "Drafting":0.6, "Revising":0.85, "Done":1 };
+const THESIS_SC = { "Not started":GREY, "Outlining":"#B39DDB", "Drafting":AMBER, "Revising":"#7E57C2", "Done":GREEN };
+const num = v => { const n = Number(v); return isFinite(n) ? n : 0; };
+
 const ACT_CATS = ["Meeting","Interview","Note","Reading","Writing","Data Collection","Analysis","Teaching – prep","Teaching – delivery","Marking","Student support","Training / Event","Paper","Admin","Milestone","Other"];
 const ACT_COLOR = { "Meeting":"#ED6C02","Interview":"#0277BD","Note":"#455A64","Reading":"#6B4E8C","Writing":"#2B1241",
   "Data Collection":"#1565C0","Analysis":"#00796B","Training / Event":"#7B1FA2","Paper":"#C2185B","Admin":"#5D7079",
@@ -314,6 +321,16 @@ const cols = {
     {k:"programme",l:"Programme / module",w:150},{k:"evidence",l:"Evidence link / location",w:220},{k:"related",l:"Related record",w:180},
     {k:"note",l:"Reflection / note",w:220},{k:"tags",l:"Tags",w:150,type:"tags"},{k:"privacy",l:"Privacy level",w:160,type:"select",opts:PRIVACY_L},{k:"usefor",l:"Use for",w:150,type:"select",opts:USE_FOR},
   ],
+  thesis: [
+    {k:"chapter",l:"Chapter",w:220},{k:"status",l:"Status",w:120,type:"select",opts:THESIS_STATUS},
+    {k:"currentWords",l:"Current words",w:110,type:"number"},{k:"targetWords",l:"Target words",w:110,type:"number"},
+    {k:"supervisorRound",l:"Supervisor round",w:120,type:"number"},{k:"lastSubmitted",l:"Last submitted",w:110},
+    {k:"fileLink",l:"File link",w:200},{k:"notes",l:"Notes",w:220},
+  ],
+  writingSessions: [
+    {k:"date",l:"Date",w:104},{k:"chapter",l:"Chapter",w:200},{k:"wordsWritten",l:"Words written",w:110,type:"number"},
+    {k:"minutes",l:"Minutes",w:90,type:"number"},{k:"nextAction",l:"Next action",w:200},{k:"blocker",l:"Blocker",w:180},{k:"note",l:"Note",w:200},
+  ],
 };
 
 const row = (keys, vals, a=[]) => { const o={_a:a}; keys.forEach((k,i)=>o[k]=vals[i]??""); return o; };
@@ -490,6 +507,15 @@ const seed = () => { const S = ({
     { _a:[], idea:"Treat the perception-gap pattern as a standalone finding", category:"Analysis", role:"PhD", date:"", status:"Exploring", notes:"Seniority/seat predicts pillar rankings" },
   ],
   reflections: [],
+  thesis: [
+    { _a:[], chapter:"1. Introduction", status:"Drafting", currentWords:0, targetWords:6000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"" },
+    { _a:[], chapter:"2. Literature Review", status:"Drafting", currentWords:0, targetWords:15000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"CREM / EFM / digital readiness" },
+    { _a:[], chapter:"3. Methodology", status:"Outlining", currentWords:0, targetWords:12000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"" },
+    { _a:[], chapter:"4. Findings", status:"Not started", currentWords:0, targetWords:15000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"" },
+    { _a:[], chapter:"5. Discussion", status:"Not started", currentWords:0, targetWords:12000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"" },
+    { _a:[], chapter:"6. Conclusion", status:"Not started", currentWords:0, targetWords:5000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"" },
+  ],
+  writingSessions: [],
   projects: STARTER_PROJECTS.map(p => ({ ...p })),
   teachingSessions: [],
   guestLectures: [
@@ -527,6 +553,7 @@ const TABS = [
   {k:"framing", group:"phd", ic:"🧭", en:"Research Framing", th:"กรอบงานวิจัย"},
   {k:"plan", group:"phd", ic:"🗓️", en:"Research Plan", th:"แผนการวิจัย"},
   {k:"timeline", group:"phd", ic:"⏳", en:"Timeline", th:"ไทม์ไลน์"},
+  {k:"thesis", group:"phd", ic:"📖", en:"Thesis Writing", th:"การเขียนเล่ม"},
   {k:"interviews", group:"phd", ic:"🎙️", en:"Interview Progress", th:"ความคืบหน้าสัมภาษณ์"},
   {k:"sources", group:"phd", ic:"📚", en:"Sources", th:"แหล่งอ้างอิง"},
   {k:"publications", group:"phd", ic:"📄", en:"Publications", th:"ผลงานตีพิมพ์"},
@@ -950,6 +977,7 @@ function App() {
           : tab === "calendar" ? <CalendarTab data={data} setRow={setRow} addRowWith={addRowWith} delRow={delRow} setData={setData} lang={lang} />
           : tab === "cv" ? <CVTab data={data} setData={setData} lang={lang} />
           : tab === "plan" ? <ResearchPlanTab data={data} setData={setData} lang={lang} />
+          : tab === "thesis" ? <ThesisTab data={data} setData={setData} update={update} delRow={delRow} pushUndo={pushUndo} lang={lang} />
           : tab === "framing" ? <ResearchFramingTab data={data} setData={setData} lang={lang} />
           : tab === "teaching" ? <TeachingTab data={data} lang={lang} />
           : tab === "lecdash" ? <LecturerDashboard data={data} setTab={setTab} lang={lang} />
@@ -2344,8 +2372,242 @@ async function fetchOutlookEvents(endpoint) {
 }
 
 // ---- Quick-Add hub (capture once, store structured) ----
+// ---- Shared writing-session modal (used by ThesisTab + AddHub) ----
+function AddSessionModal({ data, setData, pushUndo, onClose, lang }) {
+  const th = lang === "th";
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const chapters = (data.thesis || []).map(r => r.chapter).filter(Boolean);
+  const [date, setDate] = useState(todayStr);
+  const [chapter, setChapter] = useState(chapters[0] || "");
+  const [totalWords, setTotalWords] = useState("");
+  const [wordsWritten, setWordsWritten] = useState("");
+  const [minutes, setMinutes] = useState("");
+  const [nextAction, setNextAction] = useState("");
+  const [blocker, setBlocker] = useState("");
+  const [note, setNote] = useState("");
+  const timerStart = num((data.meta || {}).writeTimerStart);
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => { if (!timerStart) return; const id = setInterval(() => setNowMs(Date.now()), 1000); return () => clearInterval(id); }, [timerStart]);
+  const elapsedSec = timerStart ? Math.max(0, Math.floor((nowMs - timerStart) / 1000)) : 0;
+  const mmss = `${String(Math.floor(elapsedSec / 60)).padStart(2, "0")}:${String(elapsedSec % 60).padStart(2, "0")}`;
+  const startTimer = () => setData(d => ({ ...d, meta: { ...(d.meta || {}), writeTimerStart: Date.now() } }));
+  const stopTimer = () => {
+    const mins = timerStart ? Math.floor((Date.now() - timerStart) / 60000) : 0;
+    setMinutes(m => String(num(m) + mins));
+    setData(d => { const nm = { ...(d.meta || {}) }; delete nm.writeTimerStart; return { ...d, meta: nm }; });
+  };
+  const chapRow = (data.thesis || []).find(r => r.chapter === chapter);
+  const totalNum = totalWords.trim() === "" ? null : num(totalWords);
+  const delta = (totalNum != null && chapRow) ? Math.max(0, totalNum - num(chapRow.currentWords)) : null;
+
+  const save = () => {
+    if (!chapter) { window.alert(th ? "เลือกบทก่อน" : "Pick a chapter first."); return; }
+    const useTotal = totalNum != null && chapRow;
+    const words = useTotal ? delta : num(wordsWritten);
+    const rec = { _a: [], date, chapter, wordsWritten: Math.round(words), minutes: Math.round(num(minutes)), nextAction, blocker, note };
+    if (pushUndo) pushUndo();
+    setData(d => {
+      const nd = { ...d, writingSessions: [...(d.writingSessions || []), rec] };
+      if (useTotal) nd.thesis = (d.thesis || []).map(r => r.chapter === chapter ? { ...r, currentWords: Math.round(totalNum) } : r);
+      const nm = { ...(nd.meta || {}) }; delete nm.writeTimerStart; nd.meta = nm; // clear any running timer
+      return nd;
+    });
+    if (onClose) onClose();
+  };
+
+  const inp = { border: `1px solid ${BORDER}`, borderRadius: 6, padding: "8px 10px", fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const lab = { fontSize: 11, fontWeight: 700, color: AUB2, textTransform: "uppercase", letterSpacing: ".3px", display: "block", marginBottom: 4 };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 470, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", padding: 20, boxShadow: "0 18px 60px rgba(0,0,0,.35)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: AUB }}>✍️ {th ? "บันทึกรอบการเขียน" : "Log a writing session"}</div>
+          <button onClick={onClose} style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer", color: GREY, lineHeight: 1 }}>×</button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div><label style={lab}>{th ? "วันที่" : "Date"}</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} /></div>
+          <div><label style={lab}>{th ? "บท" : "Chapter"}</label>
+            <select value={chapter} onChange={e => setChapter(e.target.value)} style={{ ...inp, cursor: "pointer" }}>
+              {chapters.length === 0 && <option value="">{th ? "— ยังไม่มีบท —" : "— no chapters —"}</option>}
+              {chapters.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ background: CARD, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+          <label style={lab}>{th ? "จำนวนคำรวมในบทนี้ (วางจาก Word)" : "Current total words in this chapter (paste from Word)"}</label>
+          <input type="number" value={totalWords} onChange={e => setTotalWords(e.target.value)} placeholder={chapRow ? String(num(chapRow.currentWords)) : "0"} style={inp} />
+          {totalNum != null && chapRow
+            ? <div style={{ fontSize: 12, color: delta > 0 ? GREEN : GREY, marginTop: 6, fontWeight: 700 }}>{th ? "คำที่เขียนรอบนี้" : "Words this session"}: +{Math.round(delta)} <span style={{ color: GREY, fontWeight: 400 }}>({th ? "จากเดิม" : "was"} {num(chapRow.currentWords)} → {Math.round(totalNum)})</span></div>
+            : <div style={{ fontSize: 11, color: GREY, marginTop: 6 }}>{th ? "เว้นว่างไว้ แล้วกรอกจำนวนคำที่เขียนเองด้านล่างก็ได้ (บทจะไม่ถูกอัปเดต)" : "Leave blank to type words-this-session directly below (chapter total won't change)."}</div>}
+          {totalNum == null && <div style={{ marginTop: 8 }}><label style={lab}>{th ? "หรือ จำนวนคำที่เขียนรอบนี้" : "or words written this session"}</label><input type="number" value={wordsWritten} onChange={e => setWordsWritten(e.target.value)} placeholder="0" style={inp} /></div>}
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={lab}>{th ? "เวลา (นาที)" : "Minutes"}</label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="number" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="0" style={{ ...inp, width: 100 }} />
+            {timerStart
+              ? <button onClick={stopTimer} style={{ border: "none", background: RED, color: "#fff", borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>⏹ {th ? "หยุด" : "Stop"} · {mmss}</button>
+              : <button onClick={startTimer} style={{ border: "none", background: GREEN, color: "#fff", borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>▶ {th ? "เริ่มจับเวลา" : "Start timer"}</button>}
+            {timerStart ? <span style={{ fontSize: 11, color: GREY }}>{th ? "จับเวลาอยู่ (คงอยู่แม้รีเฟรช)" : "running — survives refresh"}</span> : null}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 10 }}><label style={lab}>{th ? "จะทำอะไรต่อ" : "Next action"}</label><input value={nextAction} onChange={e => setNextAction(e.target.value)} style={inp} /></div>
+        <div style={{ marginBottom: 10 }}><label style={lab}>{th ? "ติดขัดตรงไหน" : "Blocker"}</label><input value={blocker} onChange={e => setBlocker(e.target.value)} style={inp} /></div>
+        <div style={{ marginBottom: 16 }}><label style={lab}>{th ? "โน้ต" : "Note"}</label><textarea value={note} onChange={e => setNote(e.target.value)} rows={2} style={{ ...inp, resize: "vertical" }} /></div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 7, padding: "9px 16px", cursor: "pointer", fontSize: 13 }}>{th ? "ยกเลิก" : "Cancel"}</button>
+          <button onClick={save} style={{ border: "none", background: AUB, color: "#fff", borderRadius: 7, padding: "9px 18px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>{th ? "บันทึก" : "Save session"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ThesisTab({ data, setData, update, delRow, pushUndo, lang }) {
+  const th = lang === "th";
+  const [showSession, setShowSession] = useState(false);
+  const chapters = data.thesis || [];
+  const sessions = data.writingSessions || [];
+  const statLab = s => th ? (THESIS_STATUS_TH[s] || s) : s;
+
+  // B) dual progress
+  const totalCur = chapters.reduce((s, r) => s + num(r.currentWords), 0);
+  const totalTgt = chapters.reduce((s, r) => s + num(r.targetWords), 0);
+  const pctWords = totalTgt > 0 ? Math.round((totalCur / totalTgt) * 100) : 0;
+  const pctStatus = chapters.length ? Math.round((chapters.reduce((s, r) => s + (THESIS_WEIGHT[r.status] ?? 0), 0) / chapters.length) * 100) : 0;
+
+  // E) stats strip
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+  const wordsWeek = Math.round(sessions.filter(s => (s.date || "") >= weekAgo).reduce((a, s) => a + num(s.wordsWritten), 0));
+  const totalMin = sessions.reduce((a, s) => a + num(s.minutes), 0);
+  const avgWords = sessions.length ? Math.round(sessions.reduce((a, s) => a + num(s.wordsWritten), 0) / sessions.length) : 0;
+  const todaySessions = sessions.filter(s => s.date === todayStr);
+  const todayMin = Math.round(todaySessions.reduce((a, s) => a + num(s.minutes), 0));
+  const todayWords = Math.round(todaySessions.reduce((a, s) => a + num(s.wordsWritten), 0));
+  const daysWith = new Set(sessions.map(s => s.date).filter(Boolean));
+  let streak = 0, cur = new Date(todayStr + "T00:00:00");
+  while (daysWith.has(cur.toISOString().slice(0, 10))) { streak++; cur = new Date(cur.getTime() - 864e5); }
+  const sortedSessions = sessions.map((s, i) => ({ s, i })).sort((a, b) => (b.s.date || "").localeCompare(a.s.date || ""));
+
+  const addChapter = () => { if (pushUndo) pushUndo(); setData(d => ({ ...d, thesis: [...(d.thesis || []), { _a: [], chapter: th ? "บทใหม่" : "New chapter", status: "Not started", currentWords: 0, targetWords: 0, supervisorRound: 0, lastSubmitted: "", fileLink: "", notes: "" }] })); };
+
+  const stat = (label, value, color) => (
+    <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 12px", minWidth: 96 }}>
+      <div style={{ fontSize: 19, fontWeight: 800, color: color || AUB }}>{value}</div>
+      <div style={{ fontSize: 10.5, color: GREY, textTransform: "uppercase", letterSpacing: ".3px", marginTop: 2 }}>{label}</div>
+    </div>
+  );
+  const bar = (pct, color) => (
+    <div style={{ height: 8, background: OFF, borderRadius: 999, overflow: "hidden" }}><div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: "100%", background: color, borderRadius: 999 }} /></div>
+  );
+
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: AUB, marginBottom: 2 }}>📖 {th ? "การเขียนเล่มวิทยานิพนธ์" : "Thesis writing"}</div>
+      <div style={{ fontSize: 12, color: GREY, marginBottom: 16 }}>{th ? "ติดตามความคืบหน้าแต่ละบท จำนวนคำ และรอบการเขียน" : "Track each chapter, its word count, and every writing session."}</div>
+
+      {/* B) dual progress */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+        <div style={{ background: CARD, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: AUB2, textTransform: "uppercase", letterSpacing: ".3px" }}>{th ? "ความคืบหน้า — ตามจำนวนคำ" : "Progress — by words"}</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: AUB, margin: "4px 0 8px" }}>{pctWords}%</div>
+          {bar(pctWords, AUB)}
+          <div style={{ fontSize: 12, color: AUB2, marginTop: 8 }}>{totalCur.toLocaleString()} / {totalTgt.toLocaleString()} {th ? "คำ" : "words"}</div>
+        </div>
+        <div style={{ background: CARD, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: AUB2, textTransform: "uppercase", letterSpacing: ".3px" }}>{th ? "ความคืบหน้า — ตามสถานะ (ถ่วงน้ำหนัก)" : "Progress — by status (weighted)"}</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#7E57C2", margin: "4px 0 8px" }}>{pctStatus}%</div>
+          {bar(pctStatus, "#7E57C2")}
+          <div style={{ fontSize: 12, color: AUB2, marginTop: 8 }}>{chapters.length} {th ? "บท" : "chapters"} · {th ? "ถ่วงตามสถานะการเขียน" : "weighted by writing stage"}</div>
+        </div>
+      </div>
+
+      {/* A) chapters */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB }}>{th ? "บทต่าง ๆ" : "Chapters"}</div>
+        <button onClick={addChapter} style={{ border: `1px solid ${AUB}`, background: "#fff", color: AUB, borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>＋ {th ? "เพิ่มบท" : "Add chapter"}</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 22 }}>
+        {chapters.map((c, idx) => {
+          const cw = num(c.currentWords), tw = num(c.targetWords);
+          const cp = tw > 0 ? Math.min(100, Math.round((cw / tw) * 100)) : 0;
+          const sc = THESIS_SC[c.status] || GREY;
+          return (
+            <div key={idx} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <input value={c.chapter || ""} onChange={e => update("thesis", idx, "chapter", e.target.value)} style={{ flex: "1 1 180px", border: "none", borderBottom: `1px solid ${BORDER}`, fontSize: 14, fontWeight: 700, color: AUB, padding: "3px 2px" }} />
+                <select value={c.status || "Not started"} onChange={e => update("thesis", idx, "status", e.target.value)} style={{ border: `1px solid ${sc}`, color: "#fff", background: sc, borderRadius: 6, padding: "3px 8px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  {THESIS_STATUS.map(s => <option key={s} value={s} style={{ color: INK, background: "#fff" }}>{statLab(s)}</option>)}
+                </select>
+                <button onClick={() => delRow("thesis", idx)} title={th ? "ลบบท" : "delete chapter"} style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 16 }}>🗑</button>
+              </div>
+              <div style={{ margin: "8px 0 6px" }}>{bar(cp, sc)}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 12, color: AUB2 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 4 }}>{th ? "คำ" : "Words"}
+                  <input type="number" value={cw || ""} onChange={e => update("thesis", idx, "currentWords", e.target.value)} style={{ width: 78, border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 12 }} />
+                  / <input type="number" value={tw || ""} onChange={e => update("thesis", idx, "targetWords", e.target.value)} style={{ width: 78, border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 12 }} />
+                  <span style={{ color: GREY }}>({cp}%)</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 4 }} title={th ? "รอบส่งอาจารย์" : "supervisor round"}>🔁
+                  <input type="number" value={num(c.supervisorRound) || ""} onChange={e => update("thesis", idx, "supervisorRound", e.target.value)} style={{ width: 46, border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 12 }} />
+                </label>
+                {num(c.supervisorRound) > 0 && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#fff", background: "#7E57C2", borderRadius: 5, padding: "2px 7px" }}>{th ? "รอบอาจารย์" : "supervisor round"} {Math.round(num(c.supervisorRound))}</span>}
+                <label style={{ display: "flex", alignItems: "center", gap: 4 }} title={th ? "ส่งล่าสุด" : "last submitted"}>📤
+                  <input type="date" value={c.lastSubmitted || ""} onChange={e => update("thesis", idx, "lastSubmitted", e.target.value)} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 12 }} />
+                </label>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                <input value={c.fileLink || ""} onChange={e => update("thesis", idx, "fileLink", e.target.value)} placeholder={th ? "ลิงก์ไฟล์ Word / OneDrive" : "Word / OneDrive file link"} style={{ flex: 1, border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11.5 }} />
+                {c.fileLink && <a href={c.fileLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, fontWeight: 700, color: AUB, whiteSpace: "nowrap" }}>{th ? "เปิดไฟล์" : "file"} ↗</a>}
+              </div>
+            </div>
+          );
+        })}
+        {chapters.length === 0 && <div style={{ fontSize: 12, color: GREY, textAlign: "center", padding: 20 }}>{th ? "ยังไม่มีบท — กด “เพิ่มบท”" : "No chapters yet — click “Add chapter”."}</div>}
+      </div>
+
+      {/* E) writing sessions */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: AUB }}>✍️ {th ? "รอบการเขียน" : "Writing sessions"}</div>
+        <button onClick={() => setShowSession(true)} style={{ border: "none", background: AUB, color: "#fff", borderRadius: 7, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>＋ {th ? "บันทึกการเขียน" : "Add session"}</button>
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        {stat(th ? "คำสัปดาห์นี้" : "words / week", wordsWeek.toLocaleString(), AUB)}
+        {stat(th ? "รอบทั้งหมด" : "sessions", sessions.length, AUB)}
+        {stat(th ? "ชั่วโมงรวม" : "total hours", (totalMin / 60).toFixed(1), AUB)}
+        {stat(th ? "สตรีค (วัน)" : "streak (days)", streak, streak > 0 ? GREEN : GREY)}
+        {stat(th ? "เฉลี่ย/รอบ" : "avg / session", avgWords.toLocaleString(), AUB)}
+        {stat(th ? "วันนี้" : "today", `${todayWords}w · ${todayMin}m`, todayWords > 0 ? GREEN : GREY)}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {sortedSessions.map(({ s, i }) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 12px", fontSize: 12.5 }}>
+            <span style={{ color: GREY, width: 82, flex: "0 0 auto" }}>{s.date || "—"}</span>
+            <span style={{ fontWeight: 700, color: AUB, flex: "1 1 120px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.chapter || "—"}</span>
+            <span style={{ color: GREEN, fontWeight: 700, flex: "0 0 auto" }}>+{Math.round(num(s.wordsWritten))}w</span>
+            <span style={{ color: AUB2, flex: "0 0 auto" }}>{Math.round(num(s.minutes))}m</span>
+            <span style={{ color: GREY, flex: "1 1 100px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.nextAction || ""}</span>
+            <button onClick={() => delRow("writingSessions", i)} title={th ? "ลบ" : "delete"} style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 14, flex: "0 0 auto" }}>×</button>
+          </div>
+        ))}
+        {sessions.length === 0 && <div style={{ fontSize: 12, color: GREY, textAlign: "center", padding: 16 }}>{th ? "ยังไม่มีรอบการเขียน" : "No writing sessions yet."}</div>}
+      </div>
+
+      {showSession && <AddSessionModal data={data} setData={setData} pushUndo={pushUndo} onClose={() => setShowSession(false)} lang={lang} />}
+    </div>
+  );
+}
+
 function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   const [role, setRole] = useState("PhD");
+  const [showSession, setShowSession] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const HATS = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal"];
   const items = [
@@ -2358,6 +2620,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
     { k: "output", e: "📦", c: "#C2185B", en: "Add Output", th: "เพิ่มผลงาน", d: lang === "th" ? "บทความ สไลด์ สื่อการสอน" : "paper, deck, teaching material", go: () => quickAdd("outputs", { role, date: today }) },
     { k: "idea", e: "💡", c: "#2E7D32", en: "Add Idea", th: "เพิ่มไอเดีย", d: lang === "th" ? "จับความคิดไว้ก่อน" : "capture a thought", go: () => quickAdd("ideas", { role, date: today, status: "New" }) },
     { k: "project", e: "📁", c: "#1565C0", en: "Add Project", th: "เพิ่มโปรเจกต์", d: lang === "th" ? "โปรเจกต์ใหม่ + แท็กหมวก" : "a project + role tag", go: () => quickAdd("projects", { role, status: "Active", start: today }) },
+    { k: "writing", e: "✍️", c: AUB, en: "Add writing session", th: "บันทึกการเขียน", d: lang === "th" ? "นับคำ + จับเวลา → อัปเดตบทวิทยานิพนธ์" : "word count + timer → updates a thesis chapter", go: () => setShowSession(true) },
   ];
   const exportAll = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = `phd_dashboard_backup_${today}.json`; a.click(); URL.revokeObjectURL(url); };
   const importAll = e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const p = JSON.parse(r.result); if (p && typeof p === "object" && p.timeline && window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมดด้วยไฟล์นี้? (แนะนำให้สำรองก่อน)" : "Replace ALL current data with this file? (Export a backup first if unsure.)")) { if (pushUndo) pushUndo(); setData(p); } else if (!p.timeline) window.alert("This doesn't look like a dashboard backup file."); } catch (err) { window.alert(lang === "th" ? "อ่านไฟล์ JSON ไม่ได้" : "Could not read that file as JSON."); } }; r.readAsText(f); e.target.value = ""; };
@@ -2439,6 +2702,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
 
   return (
     <div>
+      {showSession && <AddSessionModal data={data} setData={setData} pushUndo={pushUndo} onClose={() => setShowSession(false)} lang={lang} />}
       <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>{lang === "th" ? "เพิ่มข้อมูลครั้งเดียว แสดงผลได้หลายที่" : "Capture once — shown in many places"}</div>
       <div style={{ fontSize: 12, color: GREY, marginBottom: 14 }}>{lang === "th" ? "เลือกหมวกงาน แล้วเลือกสิ่งที่จะบันทึก — ระบบจะเปิดแท็บที่ถูกต้องให้กรอกต่อ" : "Pick the hat, then what you're capturing — it opens the right tab, pre-tagged, ready to fill in."}</div>
 
