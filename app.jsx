@@ -2521,12 +2521,15 @@ function WorkflowGuideModal({ onClose, lang }) {
 
         <div style={{ background: CARD, borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 3 }}>🔁 {th ? "วนลูปต่อบท (นี่คือหัวใจ)" : "The per-chapter loop (this is the heart of it)"}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 10 }}>
             {LOOP.map((step, i) => (
-              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: AUB, background: "#fff", border: `1px solid ${AUB2}`, borderRadius: 999, padding: "4px 11px" }}>{step}</span>
-                {i < LOOP.length - 1 && <span style={{ color: AUB2, fontSize: 13 }}>→</span>}
-              </span>
+              <div key={i}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 22, height: 22, flex: "0 0 auto", borderRadius: 999, background: AUB, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>{i + 1}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: AUB, background: "#fff", border: `1px solid ${AUB2}`, borderRadius: 8, padding: "6px 12px", flex: 1 }}>{step}</span>
+                </div>
+                {i < LOOP.length - 1 && <div style={{ color: AUB2, fontSize: 15, lineHeight: 1, margin: "2px 0 2px 10px" }}>↓</div>}
+              </div>
             ))}
           </div>
         </div>
