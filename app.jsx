@@ -107,9 +107,9 @@ const THESIS_WEIGHT = { "Not started":0, "Outlining":0.15, "Drafting":0.6, "Revi
 const THESIS_SC = { "Not started":GREY, "Outlining":"#B39DDB", "Drafting":AMBER, "Revising":"#7E57C2", "Done":GREEN };
 const num = v => { const n = Number(v); return isFinite(n) ? n : 0; };
 
-const ACT_CATS = ["Meeting","Interview","Note","Reading","Writing","Data Collection","Analysis","Teaching – prep","Teaching – delivery","Marking","Student support","Training / Event","Paper","Admin","Milestone","Other"];
+const ACT_CATS = ["Meeting","Interview","Note","Reading","Writing","Data Collection","Analysis","Teaching – prep","Teaching – delivery","Marking","Student support","Training / Event","Seminar","Networking","Paper","Admin","Milestone","Other"];
 const ACT_COLOR = { "Meeting":"#ED6C02","Interview":"#0277BD","Note":"#455A64","Reading":"#6B4E8C","Writing":"#2B1241",
-  "Data Collection":"#1565C0","Analysis":"#00796B","Training / Event":"#7B1FA2","Paper":"#C2185B","Admin":"#5D7079",
+  "Data Collection":"#1565C0","Analysis":"#00796B","Training / Event":"#7B1FA2","Seminar":"#9C27B0","Networking":"#00ACC1","Paper":"#C2185B","Admin":"#5D7079",
   "Teaching – prep":"#0288D1","Teaching – delivery":"#0277BD","Marking":"#01579B","Student support":"#039BE5",
   "Milestone":"#2E7D32","Other":"#9E9E9E","Uncategorised":"#9E9E9E" };
 
