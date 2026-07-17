@@ -114,10 +114,11 @@ const ACT_COLOR = { "Meeting":"#ED6C02","Interview":"#0277BD","Note":"#455A64","
   "Milestone":"#2E7D32","Other":"#9E9E9E","Uncategorised":"#9E9E9E" };
 
 // ---- Roles (timeline-based) ----
-const ROLES = ["PhD","Estate","Chula Lecturer","BSSC Lecturer","BSSC PGTA","Service/Admin","Personal","Unassigned"];
+const ROLES = ["PhD","Researcher","Estate","Chula Lecturer","BSSC Lecturer","BSSC PGTA","Service/Admin","Personal","Unassigned"];
 const ROLE_META = {
   "Unassigned":{th:"ยังไม่จัดหมวด", c:"#9E9E9E", period:"", start:""},
   "PhD":{th:"ปริญญาเอก", c:"#2B1241", period:"Sep 2023 – present", start:"2023-09-25"},
+  "Researcher":{th:"นักวิจัย", c:"#6B4E8C", period:"", start:""},
   "Estate":{th:"UCL Estates", c:"#1565C0", period:"", start:""},
   "Chula Lecturer":{th:"อาจารย์ จุฬาฯ", c:"#C2185B", period:"Sep 2024 – present", start:"2024-09-01"},
   "BSSC Lecturer":{th:"อาจารย์ BSSC", c:"#00796B", period:"Nov 2025 – present", start:"2025-11-01"},
@@ -1165,7 +1166,7 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   const L = k => t(lang, k);
   const phaseName = p => lang === "th" ? (PHASE_TH[p] || p) : p;
   const totalAct = m.roleAgg.reduce((a, r) => a + r.count, 0) || 1;
-  const RORDER = ["PhD", "Estate", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal", "Unassigned"];
+  const RORDER = ["PhD", "Researcher", "Estate", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal", "Unassigned"];
   const activeRoles = m.roleAgg.filter(r => r.count > 0).slice().sort((a, b) => RORDER.indexOf(a.role) - RORDER.indexOf(b.role));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -2710,7 +2711,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   const [role, setRole] = useState("PhD");
   const [showSession, setShowSession] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
-  const HATS = ["PhD", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal"];
+  const HATS = ["PhD", "Researcher", "Estate", "Chula Lecturer", "BSSC Lecturer", "BSSC PGTA", "Service/Admin", "Personal"];
   const items = [
     { k: "task", e: "✅", c: "#5D7079", en: "Add Task", th: "เพิ่มงาน", d: lang === "th" ? "สิ่งที่ต้องทำ + สถานะ + กำหนดส่ง" : "to-do with status & deadline", go: () => quickAdd("tasks", { status: "Not started", role, category: "", due: "", title: "" }) },
     { k: "meeting", e: "🤝", c: "#ED6C02", en: "Add Meeting", th: "เพิ่มการประชุม", d: lang === "th" ? "บันทึกการประชุม (→ บันทึกกิจกรรม)" : "log a meeting (→ Activity Log)", go: () => quickAdd("activity", { category: "Meeting", role, date: today, acttype: "Supervision meeting" }) },
@@ -2871,21 +2872,23 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
 
         <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: AUB2 }}>{lang === "th" ? "แยกหมวกอัตโนมัติ (คำในหัวข้อ → หมวก)" : "Auto-assign hat (title keyword → hat)"}</span>
-            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "BSSC PGTA" }, { match: "estate, estates, iwms, mycampus, huddle, facilities, cafm, space, building", hat: "Estate" }, { match: "phd, readiness, supervis, interview, board, catch, governance, transformation", hat: "PhD" }], fallback: "Unassigned" })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
+            <span style={{ fontSize: 11, fontWeight: 700, color: AUB2 }}>{lang === "th" ? "แยกอัตโนมัติ (คำในหัวข้อ → หมวก + หมวด)" : "Auto-assign (title keyword → hat + category)"}</span>
+            {(!outlookCfg.rules || !outlookCfg.rules.length) && <button onClick={() => setOutlookCfg({ rules: [{ match: "dibam, bssc, tutorial, dissertation", hat: "BSSC PGTA", cat: "Teaching – delivery" }, { match: "seminar, webinar, lecture series, talk, symposium, spring school", hat: "PhD", cat: "Seminar" }, { match: "social, networking, drinks, mixer, welcome, christmas, party", hat: "Personal", cat: "Networking" }, { match: "estate, estates, iwms, mycampus, huddle, facilities, cafm, space, building", hat: "Estate", cat: "Meeting" }, { match: "phd, readiness, supervis, interview, board, catch, governance, transformation", hat: "PhD", cat: "Meeting" }], fallback: "Unassigned" })} style={{ border: `1px solid ${AUB}`, background: CARD, color: AUB, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>{lang === "th" ? "＋ ใส่กฎแนะนำ (PhD/Lecturer)" : "＋ Use suggested rules"}</button>}
           </div>
           {(outlookCfg.rules || []).length === 0 && <div style={{ fontSize: 10.5, color: GREY }}>{lang === "th" ? "ไม่มีกฎ = ใช้หมวกเดียว (หมวกที่เลือกด้านบน) กับทุกรายการ" : "No rules = one hat (the one selected above) for everything."}</div>}
           {(outlookCfg.rules || []).map((r, i) => (
             <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
               <input value={r.match || ""} onChange={e => { const rules = (outlookCfg.rules || []).slice(); rules[i] = { ...rules[i], match: e.target.value }; setOutlookCfg({ rules }); }} placeholder={lang === "th" ? "คำ, คำ, คำ" : "word, word, word"} style={{ flex: "1 1 240px", border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11 }} />
               <span style={{ color: GREY }}>→</span>
-              <select value={r.hat || "PhD"} onChange={e => { const rules = (outlookCfg.rules || []).slice(); rules[i] = { ...rules[i], hat: e.target.value }; setOutlookCfg({ rules }); }} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>{ROLES.map(h => <option key={h} value={h}>{roleLab(lang, h)}</option>)}</select>
+              <select value={r.hat || "PhD"} onChange={e => { const rules = (outlookCfg.rules || []).slice(); rules[i] = { ...rules[i], hat: e.target.value }; setOutlookCfg({ rules }); }} title={lang === "th" ? "หมวก (บทบาท)" : "hat (role)"} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>{ROLES.map(h => <option key={h} value={h}>{roleLab(lang, h)}</option>)}</select>
+              <span style={{ color: GREY, fontSize: 10 }}>+</span>
+              <select value={r.cat || "Meeting"} onChange={e => { const rules = (outlookCfg.rules || []).slice(); rules[i] = { ...rules[i], cat: e.target.value }; setOutlookCfg({ rules }); }} title={lang === "th" ? "หมวดกิจกรรม" : "activity category"} style={{ border: `1px solid ${ACT_COLOR[r.cat || "Meeting"] || BORDER}`, color: "#fff", background: ACT_COLOR[r.cat || "Meeting"] || GREY, fontWeight: 700, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>{ACT_CATS.map(c => <option key={c} value={c} style={{ color: INK, background: "#fff", fontWeight: 400 }}>{c}</option>)}</select>
               <button onClick={() => setOutlookCfg({ rules: (outlookCfg.rules || []).filter((_, x) => x !== i) })} title="delete" style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 15 }}>×</button>
             </div>
           ))}
           {(outlookCfg.rules || []).length > 0 && (
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
-              <button onClick={() => setOutlookCfg({ rules: [...(outlookCfg.rules || []), { match: "", hat: "PhD" }] })} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>{lang === "th" ? "＋ เพิ่มกฎ" : "＋ Add rule"}</button>
+              <button onClick={() => setOutlookCfg({ rules: [...(outlookCfg.rules || []), { match: "", hat: "PhD", cat: "Meeting" }] })} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>{lang === "th" ? "＋ เพิ่มกฎ" : "＋ Add rule"}</button>
               <label style={{ fontSize: 11, color: AUB2, display: "flex", alignItems: "center", gap: 5 }}>{lang === "th" ? "รายการที่ไม่ตรงกฎ →" : "Unmatched →"}
                 <select value={outlookCfg.fallback === undefined ? "Unassigned" : outlookCfg.fallback} onChange={e => setOutlookCfg({ fallback: e.target.value })} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 7px", fontSize: 11, cursor: "pointer" }}>
                   <option value="">{lang === "th" ? "ข้าม (ไม่นำเข้า)" : "Skip (don't import)"}</option>
@@ -2931,7 +2934,8 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
                   <input type="checkbox" checked={it.keep} onChange={e => setReviewItem(idx, { keep: e.target.checked })} />
                   <span style={{ width: 82, color: GREY, flex: "0 0 auto" }}>{it.ev.date}</span>
                   <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.ev.summary}{it.ev.busy && it.ev.busy !== "BUSY" ? <span style={{ fontSize: 9, color: AMBER }}> · {it.ev.busy}</span> : null}</span>
-                  <select value={it.role} onChange={e => setReviewItem(idx, { role: e.target.value })} disabled={!it.keep} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 11, cursor: "pointer", flex: "0 0 auto" }}>{ROLES.map(rr => <option key={rr} value={rr}>{roleLab(lang, rr)}</option>)}</select>
+                  <select value={it.role} onChange={e => setReviewItem(idx, { role: e.target.value })} disabled={!it.keep} title={lang === "th" ? "หมวก (บทบาท)" : "hat (role)"} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 11, cursor: "pointer", flex: "0 0 auto" }}>{ROLES.map(rr => <option key={rr} value={rr}>{roleLab(lang, rr)}</option>)}</select>
+                  <select value={it.cat || "Meeting"} onChange={e => setReviewItem(idx, { cat: e.target.value })} disabled={!it.keep} title={lang === "th" ? "หมวดกิจกรรม" : "activity category"} style={{ border: `1px solid ${it.keep ? (ACT_COLOR[it.cat || "Meeting"] || BORDER) : BORDER}`, color: it.keep ? "#fff" : GREY, background: it.keep ? (ACT_COLOR[it.cat || "Meeting"] || GREY) : "#fff", fontWeight: 700, borderRadius: 5, padding: "3px 6px", fontSize: 11, cursor: "pointer", flex: "0 0 auto" }}>{ACT_CATS.map(c => <option key={c} value={c} style={{ color: INK, background: "#fff", fontWeight: 400 }}>{c}</option>)}</select>
                 </div>
               ))}
             </div>
