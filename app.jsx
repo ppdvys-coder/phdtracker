@@ -1570,14 +1570,35 @@ function InterviewBoard({ data, update, setRow, addRowWith, delRow, exportCSV, l
   const openEdit = i => setEditing({ mode: "edit", index: i, draft: { ...rows[i] } });
   const openNew = () => setEditing({ mode: "new", index: null, draft: { _a: [], code: "", first: "", last: "", date: "", phase: "Invited", pis: false, consent: false, signed: false, qsent: false, interviewed: false, transcribed: false, note: "" } });
   const setField = (k, v) => setEditing(ed => ({ ...ed, draft: { ...ed.draft, [k]: v } }));
-  const save = () => { if (editing.mode === "new") addRowWith("interviews", editing.draft); else setRow("interviews", editing.index, editing.draft); setEditing(null); };
   const remove = () => { if (editing.mode === "edit") delRow("interviews", editing.index); setEditing(null); };
+
+  // ---- participants → Contacts (category "Interviewee") ----
+  const [alsoContact, setAlsoContact] = useState(true);
+  const fullName = e => `${e.first || ""} ${e.last || ""}`.trim();
+  // contacts may carry a nickname suffix — "Mohammed Aufogul (Mo)" still matches "Mohammed Aufogul"
+  const hasContact = name => { const n = name.toLowerCase(); return !!n && (data.contacts || []).some(c => (c.name || "").toLowerCase().includes(n)); };
+  const toContact = e => ({ _a: [], name: fullName(e), role: "", org: "", category: "Interviewee", relevance: e.code || "", first: "", last: e.date || "", follow: "No", next: "", notes: e.note || "", reltype: "", projconn: "", topics: "", importance: "", relfiles: "" });
+  const missing = rows.filter(e => fullName(e) && !hasContact(fullName(e)));
+  const addMissingToContacts = () => {
+    if (!missing.length) return;
+    if (!window.confirm(lang === "th" ? `เพิ่ม ${missing.length} คนเข้าผู้ติดต่อ (หมวด Interviewee)?\n\n${missing.map(e => "· " + fullName(e)).join("\n")}` : `Add ${missing.length} participant(s) to Contacts as “Interviewee”?\n\n${missing.map(e => "· " + fullName(e)).join("\n")}`)) return;
+    missing.forEach(e => addRowWith("contacts", toContact(e)));
+  };
+  const save = () => {
+    const d = editing.draft;
+    if (editing.mode === "new") {
+      addRowWith("interviews", d);
+      if (alsoContact && fullName(d) && !hasContact(fullName(d))) addRowWith("contacts", toContact(d));
+    } else setRow("interviews", editing.index, d);
+    setEditing(null);
+  };
 
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
         <button onClick={openNew} style={{ background: AUB, color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>{L("addPart")}</button>
         <button onClick={() => exportCSV("interviews")} style={{ background: "#fff", color: AUB2, border: `1px solid ${BORDER}`, borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12 }}>{L("exportCSV")}</button>
+        {missing.length > 0 && <button onClick={addMissingToContacts} title={lang === "th" ? "เพิ่มผู้เข้าร่วมที่ยังไม่มีในผู้ติดต่อ (หมวด Interviewee)" : "add participants who aren't in Contacts yet (as Interviewee)"} style={{ background: "#fff", color: AUB, border: `1px solid ${AUB}`, borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>👥 {lang === "th" ? `เพิ่มเข้าผู้ติดต่อ (${missing.length})` : `Add ${missing.length} to Contacts`}</button>}
         <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{indexed.filter(o => o.e.code).length} {lang === "th" ? "ผู้เข้าร่วม (มีรหัส)" : "coded participants"}</span>
       </div>
       <div style={{ fontSize: 11, color: AMBER, marginBottom: 10 }}>● {L("dragHint")}</div>
@@ -1613,12 +1634,12 @@ function InterviewBoard({ data, update, setRow, addRowWith, delRow, exportCSV, l
             </div>
           ); })}
       </div>
-      {editing && <InterviewModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} lang={lang} phaseLabel={phaseLabel} />}
+      {editing && <InterviewModal editing={editing} setField={setField} save={save} remove={remove} cancel={() => setEditing(null)} lang={lang} phaseLabel={phaseLabel} alsoContact={alsoContact} setAlsoContact={setAlsoContact} inContacts={hasContact(fullName(editing.draft))} />}
     </div>
   );
 }
 
-function InterviewModal({ editing, setField, save, remove, cancel, lang, phaseLabel }) {
+function InterviewModal({ editing, setField, save, remove, cancel, lang, phaseLabel, alsoContact, setAlsoContact, inContacts }) {
   const d = editing.draft; const L = k => t(lang, k);
   const st = { width: "100%", boxSizing: "border-box", border: `1px solid ${BORDER}`, borderRadius: 6, padding: "7px 9px", fontSize: 13, fontFamily: "inherit" };
   const field = (k, label, ph) => (<div><label style={{ fontSize: 11, fontWeight: 700, color: AUB2, display: "block", marginBottom: 3 }}>{label}</label><input value={d[k] || ""} onChange={e => setField(k, e.target.value)} placeholder={ph || ""} style={st} /></div>);
@@ -1643,6 +1664,14 @@ function InterviewModal({ editing, setField, save, remove, cancel, lang, phaseLa
             </div></div>
           <div><label style={{ fontSize: 11, fontWeight: 700, color: AUB2, display: "block", marginBottom: 3 }}>{colLab(lang, "Notes")}</label>
             <textarea rows={2} value={d.note || ""} onChange={e => setField("note", e.target.value)} style={{ ...st, resize: "vertical" }} /></div>
+          {editing.mode === "new"
+            ? <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: AUB2, background: CARD, borderRadius: 7, padding: "8px 10px", cursor: "pointer" }}>
+                <input type="checkbox" checked={!!alsoContact} onChange={e => setAlsoContact(e.target.checked)} />
+                👥 {lang === "th" ? "เพิ่มเข้าผู้ติดต่อด้วย (หมวด Interviewee)" : "Also add to Contacts (as “Interviewee”)"}
+              </label>
+            : inContacts
+              ? <div style={{ fontSize: 11.5, color: GREEN, background: CARD, borderRadius: 7, padding: "8px 10px" }}>✓ {lang === "th" ? "มีในผู้ติดต่อแล้ว" : "Already in Contacts"}</div>
+              : <div style={{ fontSize: 11.5, color: AMBER, background: CARD, borderRadius: 7, padding: "8px 10px" }}>● {lang === "th" ? "ยังไม่มีในผู้ติดต่อ — ใช้ปุ่ม “👥 เพิ่มเข้าผู้ติดต่อ” ที่ด้านบน" : "Not in Contacts yet — use the “👥 Add to Contacts” button above"}</div>}
         </div>
         <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: `1px solid ${BORDER}` }}>
           <button onClick={save} style={{ background: AUB, color: "#fff", border: "none", borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>{L("save")}</button>
