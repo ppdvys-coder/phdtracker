@@ -2316,8 +2316,8 @@ function parseICS(text) {
   }
   return out.map(e => ({ uid: e.uid || (e.date + "|" + (e.summary || "")), date: e.date, summary: e.summary || "(no title)", location: e.location || "", description: e.description || "", organizer: e.organizer || "", busy: e.busy || "" }));
 }
-function outlookToActivity(ev, role) {
-  return { _id: "ics-" + ev.uid, _a: [], date: ev.date, category: "Meeting", activity: ev.summary, linked: ev.organizer || "", detail: [ev.location, ev.description].filter(Boolean).join(" — "), obsidian: "", output: "", hours: 0, tag: "outlook", role: role || "PhD", acttype: "", evidence: "", reflection: "", impact: "", privacy: "" };
+function outlookToActivity(ev, role, cat) {
+  return { _id: "ics-" + ev.uid, _a: [], date: ev.date, category: cat || "Meeting", activity: ev.summary, linked: ev.organizer || "", detail: [ev.location, ev.description].filter(Boolean).join(" — "), obsidian: "", output: "", hours: 0, tag: "outlook", role: role || "PhD", acttype: "", evidence: "", reflection: "", impact: "", privacy: "" };
 }
 function filterOutlookEvents(events, filter) {
   const from = (filter.from || "").trim();
@@ -2336,15 +2336,16 @@ function filterOutlookEvents(events, filter) {
     return true;
   });
 }
-// pick a hat for an event from the keyword→hat rules (first match wins); null if none match
-function outlookHatFor(ev, rules) {
+// pick the first matching keyword rule for an event (first match wins); null if none match
+function outlookRuleFor(ev, rules) {
   const hay = `${ev.summary || ""} ${ev.location || ""}`.toLowerCase();
   for (const r of rules) {
     const terms = (r.match || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-    if (terms.length && terms.some(t => hay.includes(t))) return r.hat || "PhD";
+    if (terms.length && terms.some(t => hay.includes(t))) return r;
   }
   return null;
 }
+function outlookHatFor(ev, rules) { const r = outlookRuleFor(ev, rules); return r ? (r.hat || "PhD") : null; }
 // returns the NEW rows to append (already de-duplicated against existing activity by _id)
 function mergeOutlook(activity, events, filter) {
   const gated = filterOutlookEvents(events, filter);
@@ -2353,10 +2354,14 @@ function mergeOutlook(activity, events, filter) {
   const rows = [];
   gated.forEach(e => {
     if (dismissed.has(e.uid)) return;
-    let hat;
-    if (rules.length) { hat = outlookHatFor(e, rules); if (!hat) hat = (filter.fallback === undefined ? "Unassigned" : filter.fallback); if (!hat) return; } // rule mode: unmatched → Unassigned by default (or a chosen fallback / Skip)
-    else hat = filter.role || "PhD"; // single-hat mode
-    const a = outlookToActivity(e, hat);
+    let hat, cat = "";
+    if (rules.length) {
+      const rule = outlookRuleFor(e, rules);
+      hat = rule ? (rule.hat || "PhD") : (filter.fallback === undefined ? "Unassigned" : filter.fallback);
+      if (!hat) return; // rule mode: unmatched → Unassigned by default (or a chosen fallback / Skip)
+      cat = rule ? (rule.cat || "") : "";
+    } else hat = filter.role || "PhD"; // single-hat mode
+    const a = outlookToActivity(e, hat, cat);
     if (a.date) rows.push(a);
   });
   const have = new Set((activity || []).map(r => r._id).filter(Boolean));
@@ -2765,11 +2770,12 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
     const haveIds = new Set((data.activity || []).map(r => r._id).filter(Boolean));
     const dismissed = new Set(outlookCfg.dismissed || []);
     const rules = (outlookCfg.rules || []).filter(r => (r.match || "").trim());
-    const propose = ev => rules.length ? (outlookHatFor(ev, rules) || (outlookCfg.fallback === undefined ? "Unassigned" : outlookCfg.fallback) || "Unassigned") : (outlookCfg.role || role || "PhD");
+    const proposeRole = ev => { if (!rules.length) return outlookCfg.role || role || "PhD"; const r = outlookRuleFor(ev, rules); return (r && r.hat) || (outlookCfg.fallback === undefined ? "Unassigned" : outlookCfg.fallback) || "Unassigned"; };
+    const proposeCat = ev => { const r = rules.length ? outlookRuleFor(ev, rules) : null; return (r && r.cat) || "Meeting"; };
     const news = filterOutlookEvents(events, outlookCfg).filter(e => !haveIds.has("ics-" + e.uid) && !dismissed.has(e.uid));
     if (!news.length) { setOutMsg({ ok: true, text: lang === "th" ? "ไม่มีกิจกรรมใหม่ให้ตรวจ (ดึงครบแล้ว)" : "No new events to review (all up to date)." }); return; }
     setOutMsg(null);
-    setReview(news.map(e => ({ ev: e, keep: true, role: propose(e) })));
+    setReview(news.map(e => ({ ev: e, keep: true, role: proposeRole(e), cat: proposeCat(e) })));
   };
   const syncOutlook = async () => {
     if (!outlookEndpoint) { setOutMsg({ ok: false, text: lang === "th" ? "ยังไม่ได้ตั้งค่า Worker — ใส่ Worker URL ใน index.html หรือใช้ ‘อัปโหลด .ics’" : "No Worker URL set — add it in index.html, or use ‘Import .ics file’." }); return; }
@@ -2788,7 +2794,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   const confirmReview = () => {
     const toImport = review.filter(i => i.keep);
     const toDismiss = review.filter(i => !i.keep).map(i => i.ev.uid);
-    const rows = toImport.map(i => outlookToActivity(i.ev, i.role));
+    const rows = toImport.map(i => outlookToActivity(i.ev, i.role, i.cat));
     if (pushUndo) pushUndo();
     const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
     setData(d => ({ ...d, activity: [...(d.activity || []), ...rows], meta: { ...(d.meta || {}), outlook: { ...((d.meta && d.meta.outlook) || {}), role, dismissed: [...new Set([...(((d.meta && d.meta.outlook) || {}).dismissed || []), ...toDismiss])], lastImport: nowStr } } }));
