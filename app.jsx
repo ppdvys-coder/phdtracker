@@ -992,6 +992,7 @@ function App() {
           : tab === "chula" ? <RoleSummaryTab data={data} role="Chula Lecturer" icon="🏛️" setTab={setTab} lang={lang} />
           : tab === "pgta" ? <RoleSummaryTab data={data} role="BSSC PGTA" icon="🎒" setTab={setTab} lang={lang} />
           : tab === "projects" ? <ProjectsTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
+          : tab === "tasks" ? <TasksBoard data={data} update={update} addRowWith={addRowWith} delRow={delRow} setRow={setRow} exportCSV={exportCSV} pushUndo={pushUndo} lang={lang} />
           : tab === "unassigned" ? <RoleSummaryTab data={data} role="Unassigned" icon="📥" setTab={setTab} lang={lang} />
           : tab === "search" ? <SearchResults data={data} q={searchQ} setQ={setSearchQ} goSearch={goSearch} setTab={setTab} setGroup={setGroup} lang={lang} />
           : <TableTab tabKey={tab} data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />}
@@ -1554,6 +1555,93 @@ function EntryModal({ editing, setField, save, remove, cancel, vault, contactNam
           <button onClick={cancel} style={{ background: "#fff", color: AUB2, border: `1px solid ${BORDER}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>{L("cancel")}</button>
           {editing.mode === "edit" && <button onClick={remove} style={{ marginLeft: "auto", background: "#fff", color: RED, border: `1px solid ${RED}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>{L("del")}</button>}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TasksBoard({ data, update, addRowWith, delRow, setRow, exportCSV, pushUndo, lang }) {
+  const th = lang === "th";
+  const COLS = [
+    { k: "Not started", en: "To do", th: "ยังไม่เริ่ม", c: GREY },
+    { k: "In progress", en: "In progress", th: "กำลังทำ", c: AMBER },
+    { k: "Awaiting", en: "Awaiting", th: "รออยู่", c: "#6B4E8C" },
+    { k: "Done", en: "Done", th: "เสร็จ", c: GREEN },
+  ];
+  const [quick, setQuick] = useState("");
+  const [quickHat, setQuickHat] = useState("PhD");
+  const [roleF, setRoleF] = useState("all");
+  const [dragOver, setDragOver] = useState(null);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const rows = data.tasks || [];
+  const indexed = rows.map((r, i) => ({ r, i })).filter(o => roleF === "all" || hasRole(o.r, roleF));
+  const roleChips = ["all", ...ROLES.filter(x => x !== "Unassigned"), "Unassigned"].filter(x => x === "all" || rows.some(r => hasRole(r, x)));
+  const overdue = r => r.due && r.due < todayStr && r.status !== "Done";
+  const addQuick = () => { const title = quick.trim(); if (!title) return; if (pushUndo) pushUndo(); addRowWith("tasks", { title, status: "Not started", role: quickHat, category: "", due: "", notes: "" }); setQuick(""); };
+  const move = (idx, status) => update("tasks", idx, "status", status);
+  const onDrop = (e, status) => { e.preventDefault(); const idx = Number(e.dataTransfer.getData("text/plain")); if (!Number.isNaN(idx)) move(idx, status); setDragOver(null); };
+  const openCount = rows.filter(r => r.status !== "Done").length;
+  const dueSoon = rows.filter(r => overdue(r)).length;
+
+  return (
+    <div>
+      {/* quick add */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+        <input value={quick} onChange={e => setQuick(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addQuick(); }} placeholder={th ? "พิมพ์งานใหม่ แล้วกด Enter…" : "Type a new task, press Enter…"} style={{ flex: "1 1 320px", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "9px 12px", fontSize: 13 }} />
+        <select value={quickHat} onChange={e => setQuickHat(e.target.value)} title={th ? "หมวก" : "hat"} style={{ border: `1px solid ${roleColor(quickHat)}`, color: "#fff", background: roleColor(quickHat), fontWeight: 700, borderRadius: 8, padding: "9px 10px", fontSize: 12, cursor: "pointer" }}>{ROLES.filter(r => r !== "Unassigned").map(r => <option key={r} value={r} style={{ color: INK, background: "#fff", fontWeight: 400 }}>{roleLab(lang, r)}</option>)}</select>
+        <button onClick={addQuick} style={{ background: AUB, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>＋ {th ? "เพิ่ม" : "Add"}</button>
+        <button onClick={() => exportCSV("tasks")} style={{ background: "#fff", color: AUB2, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "9px 12px", cursor: "pointer", fontSize: 12 }}>{th ? "ส่งออก CSV" : "Export CSV"}</button>
+      </div>
+
+      {/* stats + role filter */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: AUB }}>{openCount} {th ? "งานค้าง" : "open"}</span>
+        {dueSoon > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: RED, borderRadius: 999, padding: "2px 9px" }}>⚠ {dueSoon} {th ? "เลยกำหนด" : "overdue"}</span>}
+        <span style={{ width: 1, height: 16, background: BORDER, margin: "0 2px" }} />
+        {roleChips.map(rc => { const on = roleF === rc; const lbl = rc === "all" ? (th ? "ทุกหมวก" : "All hats") : roleLab(lang, rc); const col = rc === "all" ? AUB : roleColor(rc);
+          return <button key={rc} onClick={() => setRoleF(rc)} style={{ border: `1px solid ${on ? col : BORDER}`, background: on ? col : "#fff", color: on ? "#fff" : AUB2, borderRadius: 999, padding: "4px 11px", cursor: "pointer", fontSize: 11.5, fontWeight: on ? 700 : 500 }}>{lbl}</button>; })}
+      </div>
+
+      {/* board */}
+      <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8, alignItems: "flex-start" }}>
+        {COLS.map(col => { const items = indexed.filter(o => (o.r.status || "Not started") === col.k); const isOver = dragOver === col.k;
+          return (
+            <div key={col.k} onDragOver={e => { e.preventDefault(); setDragOver(col.k); }} onDragLeave={() => setDragOver(null)} onDrop={e => onDrop(e, col.k)}
+              style={{ minWidth: 240, width: 240, flex: "1 1 240px", background: isOver ? "#EFEAF3" : OFF, border: `1px solid ${isOver ? AUB : BORDER}`, borderRadius: 10, padding: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: col.c }} />
+                <span style={{ fontWeight: 800, fontSize: 12, color: AUB }}>{th ? col.th : col.en}</span>
+                <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{items.length}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {items.map(({ r, i }) => {
+                  const isDone = r.status === "Done";
+                  const od = overdue(r);
+                  return (
+                    <div key={i} draggable onDragStart={e => { e.dataTransfer.setData("text/plain", String(i)); e.dataTransfer.effectAllowed = "move"; }}
+                      style={{ background: "#fff", border: `1px solid ${od ? RED : BORDER}`, borderLeft: `4px solid ${col.c}`, borderRadius: 7, padding: "8px 9px", cursor: "grab" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                        <input type="checkbox" checked={isDone} title={th ? "ทำเสร็จ" : "mark done"} onChange={e => move(i, e.target.checked ? "Done" : "Not started")} style={{ marginTop: 3, cursor: "pointer", flex: "0 0 auto" }} />
+                        <textarea value={r.title || ""} onChange={e => update("tasks", i, "title", e.target.value)} rows={1} placeholder={th ? "ชื่องาน" : "task"} style={{ flex: 1, border: "none", resize: "none", fontSize: 12.5, fontWeight: 600, color: isDone ? GREY : INK, textDecoration: isDone ? "line-through" : "none", fontFamily: "inherit", padding: 0, background: "transparent", outline: "none", overflow: "hidden" }} />
+                        <button onClick={() => { if (window.confirm(th ? "ลบงานนี้? (ย้ายไปถังขยะ)" : "Delete this task? (moves to Trash)")) delRow("tasks", i); }} title={th ? "ลบ" : "delete"} style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 13, flex: "0 0 auto" }}>×</button>
+                      </div>
+                      <div style={{ marginTop: 6 }}><RoleTagCell value={r.role} onChange={v => update("tasks", i, "role", v)} lang={lang} /></div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                        <input value={r.category || ""} onChange={e => update("tasks", i, "category", e.target.value)} placeholder={th ? "โปรเจกต์ / หมวด" : "project / category"} style={{ flex: "1 1 90px", minWidth: 60, border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 10.5, color: AUB2 }} />
+                        <DateCell value={r.due} onChange={v => update("tasks", i, "due", v)} common={{ border: `1px solid ${od ? RED : BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 10.5, color: od ? RED : AUB2, fontWeight: od ? 700 : 400, boxSizing: "border-box" }} />
+                      </div>
+                      <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                        {COLS.map(c => c.k === (r.status || "Not started") ? null : (
+                          <button key={c.k} onClick={() => move(i, c.k)} title={(th ? "ย้ายไป " : "move to ") + (th ? c.th : c.en)} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: c.c, borderRadius: 5, padding: "2px 7px", cursor: "pointer", fontSize: 10, fontWeight: 700 }}>{th ? c.th : c.en}</button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {items.length === 0 && <div style={{ fontSize: 11, color: "#C4C4C4", textAlign: "center", padding: "12px 0" }}>—</div>}
+              </div>
+            </div>
+          ); })}
       </div>
     </div>
   );
@@ -2377,6 +2465,9 @@ function outlookRuleFor(ev, rules) {
 }
 function outlookHatFor(ev, rules) { const r = outlookRuleFor(ev, rules); return r ? (r.hat || "PhD") : null; }
 // returns the NEW rows to append (already de-duplicated against existing activity by _id)
+// normalise a title for duplicate-matching (case/spacing-insensitive)
+const normTitle = s => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+const titleDateKey = (date, title) => (date || "") + "|" + normTitle(title);
 function mergeOutlook(activity, events, filter) {
   const gated = filterOutlookEvents(events, filter);
   const rules = Array.isArray(filter.rules) ? filter.rules.filter(r => (r.match || "").trim()) : [];
@@ -2395,7 +2486,8 @@ function mergeOutlook(activity, events, filter) {
     if (a.date) rows.push(a);
   });
   const have = new Set((activity || []).map(r => r._id).filter(Boolean));
-  const addRows = rows.filter(a => !have.has(a._id));
+  const haveTD = new Set((activity || []).map(r => titleDateKey(r.date, r.activity))); // also skip anything already logged with same date + title (e.g. added by hand)
+  const addRows = rows.filter(a => !have.has(a._id) && !haveTD.has(titleDateKey(a.date, a.activity)));
   return { addRows, added: addRows.length, skipped: rows.length - addRows.length };
 }
 async function fetchOutlookEvents(endpoint) {
@@ -2798,11 +2890,12 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   // gather NEW events (not already imported, not previously discarded) with a proposed role → open the review window
   const openReview = events => {
     const haveIds = new Set((data.activity || []).map(r => r._id).filter(Boolean));
+    const haveTD = new Set((data.activity || []).map(r => titleDateKey(r.date, r.activity))); // skip events already logged by hand (same date + title)
     const dismissed = new Set(outlookCfg.dismissed || []);
     const rules = (outlookCfg.rules || []).filter(r => (r.match || "").trim());
     const proposeRole = ev => { if (!rules.length) return outlookCfg.role || role || "PhD"; const r = outlookRuleFor(ev, rules); return (r && r.hat) || (outlookCfg.fallback === undefined ? "Unassigned" : outlookCfg.fallback) || "Unassigned"; };
     const proposeCat = ev => { const r = rules.length ? outlookRuleFor(ev, rules) : null; return (r && r.cat) || "Meeting"; };
-    const news = filterOutlookEvents(events, outlookCfg).filter(e => !haveIds.has("ics-" + e.uid) && !dismissed.has(e.uid));
+    const news = filterOutlookEvents(events, outlookCfg).filter(e => !haveIds.has("ics-" + e.uid) && !dismissed.has(e.uid) && !haveTD.has(titleDateKey(e.date, e.summary)));
     if (!news.length) { setOutMsg({ ok: true, text: lang === "th" ? "ไม่มีกิจกรรมใหม่ให้ตรวจ (ดึงครบแล้ว)" : "No new events to review (all up to date)." }); return; }
     setOutMsg(null);
     setReview(news.map(e => ({ ev: e, keep: true, role: proposeRole(e), cat: proposeCat(e) })));
