@@ -587,6 +587,7 @@ const TABS = [
   {k:"plan", group:"phd", ic:"🗓️", en:"Research Plan", th:"แผนการวิจัย"},
   {k:"timeline", group:"phd", ic:"⏳", en:"Timeline", th:"ไทม์ไลน์"},
   {k:"thesis", group:"phd", ic:"📖", en:"Thesis Writing", th:"การเขียนเล่ม"},
+  {k:"phdTimetable", group:"phd", ic:"🗺️", en:"PhD Timetable", th:"ตารางเวลา PhD"},
   {k:"interviews", group:"phd", ic:"🎙️", en:"Interview Progress", th:"ความคืบหน้าสัมภาษณ์"},
   {k:"sources", group:"phd", ic:"📚", en:"Sources", th:"แหล่งอ้างอิง"},
   {k:"publications", group:"phd", ic:"📄", en:"Publications", th:"ผลงานตีพิมพ์"},
@@ -1012,6 +1013,7 @@ function App() {
           : tab === "cv" ? <CVTab data={data} setData={setData} lang={lang} />
           : tab === "plan" ? <ResearchPlanTab data={data} setData={setData} lang={lang} />
           : tab === "thesis" ? <ThesisTab data={data} setData={setData} update={update} delRow={delRow} pushUndo={pushUndo} lang={lang} />
+          : tab === "phdTimetable" ? <PhdTimetableTab lang={lang} />
           : tab === "framing" ? <ResearchFramingTab data={data} setData={setData} lang={lang} />
           : tab === "teaching" ? <TeachingTab data={data} lang={lang} />
           : tab === "lecdash" ? <LecturerDashboard data={data} setTab={setTab} lang={lang} />
@@ -2876,6 +2878,101 @@ function ThesisTab({ data, setData, update, delRow, pushUndo, lang }) {
 
       {showSession && <AddSessionModal data={data} setData={setData} pushUndo={pushUndo} onClose={() => setShowSession(false)} lang={lang} />}
       {showGuide && <WorkflowGuideModal onClose={() => setShowGuide(false)} lang={lang} />}
+    </div>
+  );
+}
+
+function PhdTimetableTab({ lang }) {
+  const th = lang === "th";
+  const START = (ROLE_META["PhD"] && ROLE_META["PhD"].start) || "2023-09-25";
+  const startDate = new Date(START + "T00:00:00");
+  const addMonths = n => { const d = new Date(startDate.getTime()); d.setMonth(d.getMonth() + n); return d; };
+  const fmt = d => d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  const elapsed = Math.max(0, Math.round((Date.now() - startDate.getTime()) / (30.4375 * 864e5)));
+  const MS = [
+    { off: 0, label: { en: "Before month 1", th: "ก่อนเดือนที่ 1" }, items: [
+      "Research project agreed",
+      "Assignment of all supervisors (at least two)",
+      "Agree a strict timetable for supervisory meetings and progress reports",
+      "Provide research equipment & facilities; identify research support needed (e.g. a postdoc, courses, or support outside the supervisory team)",
+    ] },
+    { off: 3, label: { en: "3 months", th: "3 เดือน" }, items: [
+      "Agree thesis work plan, research methods and timetable (i.e. the research proposal)",
+      "Agree an initial personal development plan, including planned attendance of the Doctoral Skills Development Programme",
+    ] },
+    { off: 12, label: { en: "12 months", th: "12 เดือน" }, note: { en: "upgrade window 9–18 months — as early as reasonable", th: "ช่วงอัปเกรด 9–18 เดือน — ยิ่งเร็วยิ่งดี" }, items: [
+      "Agree research & development plan for the second year of study",
+      "Transfer / upgrade registration from MPhil to PhD",
+    ] },
+    { off: 24, label: { en: "24 months", th: "24 เดือน" }, items: [
+      "Agree the thesis structure and a strict timetable for thesis writing and submission",
+    ] },
+    { off: 30, label: { en: "30 months", th: "30 เดือน" }, note: { en: "not less than 4 months before expected submission", th: "ไม่น้อยกว่า 4 เดือนก่อนกำหนดส่ง" }, items: [
+      "Entry for examination",
+      "Nomination of examiners",
+    ] },
+    { off: 36, label: { en: "36 months", th: "36 เดือน" }, note: { en: "48 months for a 4-year programme", th: "48 เดือนสำหรับหลักสูตร 4 ปี" }, items: [
+      "Submission of thesis",
+    ] },
+    { off: 36, offEnd: 48, label: { en: "36–48 months", th: "36–48 เดือน" }, items: [
+      "Completing Research Student (CRS) status, if necessary",
+    ] },
+  ];
+  const upper = (ms, i) => ms.offEnd || (MS.slice(i + 1).find(m => m.off > ms.off) || {}).off || Infinity;
+  const stateOf = (ms, i) => elapsed < ms.off ? "upcoming" : (elapsed < upper(ms, i) ? "now" : "past");
+  const SC = { past: GREEN, now: AMBER, upcoming: GREY };
+  const SLAB = { past: th ? "ผ่านมาแล้ว" : "elapsed", now: th ? "● คุณอยู่ตรงนี้" : "● you are here", upcoming: th ? "ข้างหน้า" : "upcoming" };
+
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: AUB, marginBottom: 2 }}>🗺️ {th ? "ตารางเวลามาตรฐาน PhD เต็มเวลา" : "Typical timetable for a full-time PhD"}</div>
+      <div style={{ fontSize: 12, color: GREY, marginBottom: 14 }}>{th ? "อ้างอิง UCL Code of Practice — วันที่คาดการณ์คำนวณจากวันเริ่ม PhD ของคุณ" : "From the UCL Code of Practice — projected dates computed from your PhD start."}</div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
+        <div style={{ background: CARD, borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ fontSize: 10.5, color: AUB2, textTransform: "uppercase", letterSpacing: ".3px", fontWeight: 700 }}>{th ? "เริ่ม PhD" : "PhD start"}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>{fmt(startDate)}</div>
+        </div>
+        <div style={{ background: CARD, borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ fontSize: 10.5, color: AUB2, textTransform: "uppercase", letterSpacing: ".3px", fontWeight: 700 }}>{th ? "ผ่านมาแล้ว" : "elapsed"}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: AMBER }}>≈ {elapsed} {th ? "เดือน" : "months"}</div>
+        </div>
+        <div style={{ background: CARD, borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ fontSize: 10.5, color: AUB2, textTransform: "uppercase", letterSpacing: ".3px", fontWeight: 700 }}>{th ? "กำหนดส่ง (36 ด.)" : "submission (36m)"}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>{fmt(addMonths(36))}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {MS.map((ms, i) => {
+          const st = stateOf(ms, i); const col = SC[st];
+          const dateStr = ms.offEnd ? `${fmt(addMonths(ms.off))} – ${fmt(addMonths(ms.offEnd))}` : fmt(addMonths(ms.off));
+          return (
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 auto", width: 20 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 999, background: col, border: st === "now" ? `3px solid ${AMBER}` : "none", boxShadow: st === "now" ? `0 0 0 3px ${OFF}` : "none", marginTop: 16 }} />
+                {i < MS.length - 1 && <div style={{ flex: 1, width: 2, background: BORDER, marginTop: 2 }} />}
+              </div>
+              <div style={{ flex: 1, background: st === "now" ? "#FFF7E6" : "#fff", border: `1px solid ${st === "now" ? AMBER : BORDER}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: AUB }}>{th ? ms.label.th : ms.label.en}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: AUB2, borderRadius: 5, padding: "2px 8px" }}>{dateStr}</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: "#fff", background: col, borderRadius: 5, padding: "2px 8px" }}>{SLAB[st]}</span>
+                  {ms.note && <span style={{ fontSize: 11, fontStyle: "italic", color: AUB2 }}>{th ? ms.note.th : ms.note.en}</span>}
+                </div>
+                <ul style={{ margin: "2px 0 0", paddingLeft: 18, color: INK, fontSize: 12.5, lineHeight: 1.55 }}>
+                  {ms.items.map((it, j) => <li key={j} style={{ marginBottom: 2 }}>{it}</li>)}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 6, fontSize: 11.5, color: GREY }}>
+        {th ? "ที่มา: " : "Source: "}
+        <a href="https://www.ucl.ac.uk/study/doctoral-school/rights-and-responsibilities/graduate-research-degrees-code-practice#crss" target="_blank" rel="noopener noreferrer" style={{ color: AUB, fontWeight: 700 }}>UCL Graduate Research Degrees — Code of Practice ↗</a>
+      </div>
     </div>
   );
 }
