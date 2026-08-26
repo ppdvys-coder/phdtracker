@@ -1015,7 +1015,7 @@ function App() {
       <div style={{ padding: 18 }}>
         {tab === "dashboard" ? <Dashboard m={m} data={data} update={update} setTab={setTab} resetAll={resetAll} lang={lang} />
           : tab === "interviews" ? <InterviewBoard data={data} update={update} setRow={setRow} addRowWith={addRowWith} delRow={delRow} exportCSV={exportCSV} lang={lang} />
-          : tab === "calendar" ? <CalendarTab data={data} setRow={setRow} addRowWith={addRowWith} delRow={delRow} setData={setData} lang={lang} />
+          : tab === "calendar" ? <CalendarTab data={data} setRow={setRow} addRowWith={addRowWith} delRow={delRow} setData={setData} setTab={setTab} setGroup={setGroup} lang={lang} />
           : tab === "cv" ? <CVTab data={data} setData={setData} lang={lang} />
           : tab === "plan" ? <ResearchPlanTab data={data} setData={setData} lang={lang} />
           : tab === "thesis" ? <ThesisTab data={data} setData={setData} update={update} delRow={delRow} pushUndo={pushUndo} lang={lang} />
@@ -1668,7 +1668,7 @@ function CalendarView({ indexed, full, cal, setCal, openEdit, openNew, lang }) {
           return (
             <div key={idx} onDoubleClick={() => openNew({ date: key })} style={{ minHeight: 80, background: "#fff", border: `1px solid ${isT ? AUB : BORDER}`, borderRadius: 6, padding: 4, cursor: "pointer" }}>
               <div style={{ fontSize: 11, fontWeight: isT ? 800 : 500, color: isT ? AUB : GREY, marginBottom: 2 }}>{d}</div>
-              {items.slice(0, 3).map(o => (<div key={o.i} onClick={e => { e.stopPropagation(); openEdit(o.i); }} title={o.e.activity} style={{ fontSize: 10, color: "#fff", background: ACT_COLOR[o.e.category] || GREY, borderRadius: 4, padding: "1px 4px", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.e.activity || "—"}</div>))}
+              {items.slice(0, 3).map(o => (<div key={o._k || o.i} onClick={e => { e.stopPropagation(); openEdit(o.i, o); }} title={o.e.activity} style={{ fontSize: 10, color: "#fff", background: ACT_COLOR[o.e.category] || GREY, borderRadius: 4, padding: "1px 4px", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.e.activity || "—"}</div>))}
               {items.length > 3 && <div style={{ fontSize: 10, color: AUB2 }}>+{items.length - 3}</div>}
             </div>
           ); })}
@@ -1677,7 +1677,7 @@ function CalendarView({ indexed, full, cal, setCal, openEdit, openNew, lang }) {
       {unsched.length > 0 && (
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: AUB, marginBottom: 6 }}>{L("undated")}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{unsched.map(o => <div key={o.i} onClick={() => openEdit(o.i)} style={{ fontSize: 11, color: "#fff", background: ACT_COLOR[o.e.category] || GREY, borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>{o.e.date ? o.e.date + " · " : ""}{o.e.activity || "—"}</div>)}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{unsched.map(o => <div key={o._k || o.i} onClick={() => openEdit(o.i, o)} style={{ fontSize: 11, color: "#fff", background: ACT_COLOR[o.e.category] || GREY, borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>{o.e.date ? o.e.date + " · " : ""}{o.e.activity || "—"}</div>)}</div>
         </div>
       )}
     </div>
@@ -1958,7 +1958,7 @@ function InterviewModal({ editing, setField, save, remove, cancel, lang, phaseLa
   );
 }
 
-function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
+function CalendarTab({ data, setRow, addRowWith, delRow, setData, setTab, setGroup, lang }) {
   const L = k => t(lang, k);
   const [order, setOrder] = useState("desc");
   const [yearF, setYearF] = useState("all");
@@ -1966,10 +1966,17 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
   const [editing, setEditing] = useState(null);
   const [view, setView] = useState("list");     // list · week · month · year
   const [cal, setCal] = useState(() => new Date());
+  const [showTeaching, setShowTeaching] = useState(true);   // overlay Teaching Sessions (read-only)
   const locale = lang === "th" ? "th-TH" : "en-GB";
   const vault = (data.meta && data.meta.vault) || "";
   const contactNames = data.contacts.map(c => c.name).filter(Boolean);
-  const entriesAll = data.activity.map((e, i) => ({ e, i }));
+  const teachHat = r => (String(r || "").toLowerCase().includes("pgta") ? "BSSC PGTA" : "BSSC Lecturer");
+  const actEntries = data.activity.map((e, i) => ({ e, i, _store: "activity", _k: "a" + i }));
+  const teachEntries = showTeaching ? (data.teachingSessions || []).map((r, i) => ({
+    e: { date: r.date, activity: r.title || ((r.programme || "") + " session"), category: "Teaching – delivery", role: teachHat(r.role), detail: r.topic || "", hours: r.hours || 0, tag: "teaching" },
+    i, _store: "teachingSessions", _k: "t" + i, _ro: true,
+  })) : [];
+  const entriesAll = [...actEntries, ...teachEntries];
   const entries = roleF === "all" ? entriesAll : entriesAll.filter(o => hasRole(o.e, roleF));
 
   const groups = {}; const undated = [];
@@ -1983,7 +1990,10 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
   const dayOf = dstr => { const m = (dstr || "").match(/^\d{4}-\d{2}-(\d{2})$/); return m ? String(Number(m[1])) : "—"; };
   const dowOf = dstr => { if (!/^\d{4}-\d{2}-\d{2}$/.test(dstr || "")) return ""; const d = new Date(dstr); return d.toLocaleString(locale, { weekday: "short" }); };
 
-  const openEdit = i => setEditing({ mode: "edit", index: i, draft: { ...data.activity[i] } });
+  const openEdit = (i, o) => {
+    if (o && o._store === "teachingSessions") { if (setGroup) setGroup("bssc"); if (setTab) setTab("teachingSessions"); return; } // read-only in calendar → jump to its tab to edit
+    setEditing({ mode: "edit", index: i, draft: { ...data.activity[i] } });
+  };
   const openNew = pre => setEditing({ mode: "new", index: null, draft: { _a: [], date: "", category: "", activity: "", linked: "", detail: "", obsidian: "", output: "", hours: 0, tag: "", role: roleF !== "all" ? roleF : "PhD", ...pre } });
   const setField = (k, v) => setEditing(ed => { const dr = { ...ed.draft, [k]: v }; if (dr._a && dr._a.includes(k)) dr._a = dr._a.filter(x => x !== k); return { ...ed, draft: dr }; });
   const save = () => { if (editing.mode === "new") addRowWith("activity", editing.draft); else setRow("activity", editing.index, editing.draft); setEditing(null); };
@@ -2005,7 +2015,7 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
         </div>
         {sortItems(items).map(o => { const assumed = o.e._a && o.e._a.length > 0; const href = obsHref(o.e.obsidian, vault);
           return (
-            <div key={o.i} onClick={() => openEdit(o.i)} style={{ display: "flex", gap: 10, padding: "8px 14px", borderTop: `1px solid ${BORDER}`, cursor: "pointer", fontSize: 12, alignItems: "baseline" }}>
+            <div key={o._k || o.i} onClick={() => openEdit(o.i, o)} style={{ display: "flex", gap: 10, padding: "8px 14px", borderTop: `1px solid ${BORDER}`, cursor: "pointer", fontSize: 12, alignItems: "baseline" }}>
               <span style={{ width: 40, textAlign: "center", flex: "0 0 auto" }}>
                 <span style={{ fontSize: 15, fontWeight: 800, color: assumed ? RED : AUB }}>{dayOf(o.e.date)}</span>
                 <span style={{ fontSize: 9, color: GREY, display: "block", lineHeight: 1 }}>{dowOf(o.e.date)}</span>
@@ -2047,7 +2057,7 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
             return (
               <div key={k} onDoubleClick={() => openNew({ date: key })} style={{ minHeight: 120, background: "#fff", border: `1px solid ${isT ? AUB : BORDER}`, borderRadius: 6, padding: 5 }}>
                 <div style={{ fontSize: 11, fontWeight: isT ? 800 : 600, color: isT ? AUB : GREY, marginBottom: 3 }}>{dowN[k]} {dt.getDate()}</div>
-                {items.map(o => <div key={o.i} onClick={() => openEdit(o.i)} title={o.e.activity} style={{ fontSize: 10, color: "#fff", background: ACT_COLOR[o.e.category] || GREY, borderRadius: 4, padding: "2px 5px", marginBottom: 2, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.e.activity || "—"}</div>)}
+                {items.map(o => <div key={o._k || o.i} onClick={() => openEdit(o.i, o)} title={o.e.activity} style={{ fontSize: 10, color: "#fff", background: ACT_COLOR[o.e.category] || GREY, borderRadius: 4, padding: "2px 5px", marginBottom: 2, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.e.activity || "—"}</div>)}
               </div>
             ); })}
         </div>
@@ -2091,6 +2101,9 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
         {view === "list" && <button onClick={() => setOrder(o => o === "desc" ? "asc" : "desc")} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 6, padding: "4px 11px", cursor: "pointer", fontSize: 12 }}>
           {order === "desc" ? (lang === "th" ? "ใหม่ → เก่า ↓" : "Newest first ↓") : (lang === "th" ? "เก่า → ใหม่ ↑" : "Oldest first ↑")}
         </button>}
+        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, color: AUB2, cursor: "pointer", marginLeft: 4 }} title={lang === "th" ? "แสดงคาบสอนจาก Teaching Sessions (อ่านอย่างเดียว — คลิกเพื่อไปแก้ในแท็บนั้น)" : "Overlay Teaching Sessions (read-only — click to edit in that tab)"}>
+          <input type="checkbox" checked={showTeaching} onChange={e => setShowTeaching(e.target.checked)} />📚 {lang === "th" ? "รวมคาบสอน" : "Teaching"}
+        </label>
         <button onClick={() => openNew({})} style={{ background: AUB, color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>{L("addEntry")}</button>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
@@ -2110,7 +2123,7 @@ function CalendarTab({ data, setRow, addRowWith, delRow, setData, lang }) {
               <span style={{ fontSize: 11, color: GREY }}>{undated.length}</span>
             </div>
             {undated.map(o => (
-              <div key={o.i} onClick={() => openEdit(o.i)} style={{ display: "flex", gap: 10, padding: "8px 14px", borderTop: `1px solid ${BORDER}`, cursor: "pointer", fontSize: 12, alignItems: "baseline" }}>
+              <div key={o._k || o.i} onClick={() => openEdit(o.i, o)} style={{ display: "flex", gap: 10, padding: "8px 14px", borderTop: `1px solid ${BORDER}`, cursor: "pointer", fontSize: 12, alignItems: "baseline" }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: ACT_COLOR[o.e.category] || GREY, flex: "0 0 auto", marginTop: 4 }} />
                 <span style={{ flex: 1 }}><span style={{ color: INK, fontWeight: 700 }}>{o.e.activity || "—"}</span>{o.e.linked ? <span style={{ color: AUB2 }}> · {o.e.linked}</span> : null}</span>
               </div>
