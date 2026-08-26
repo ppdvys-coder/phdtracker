@@ -282,7 +282,7 @@ const cols = {
     {k:"status",l:"Status",w:130,type:"select",opts:["New","Exploring","Parked","Using","Dropped"]},{k:"notes",l:"Notes",w:240},
   ],
   projects: [
-    {k:"title",l:"Project",w:250},{k:"role",l:"Role",w:130,type:"roles"},
+    {k:"title",l:"Project",w:250},{k:"key",l:"Key",w:90},{k:"role",l:"Role",w:130,type:"roles"},
     {k:"status",l:"Status",w:130,type:"select",opts:["Idea","Planned","Active","On hold","Completed","Dropped"]},
     {k:"start",l:"Start",w:104},{k:"end",l:"Target / end",w:104},{k:"category",l:"Area / type",w:150},
     {k:"people",l:"Collaborators",w:170,type:"people"},{k:"link",l:"Link / location",w:190},{k:"notes",l:"Notes",w:280},
@@ -347,6 +347,11 @@ const cols = {
     {k:"link",l:"Link / location",w:240,type:"link"},{k:"source",l:"Source",w:150,type:"tags"},
     {k:"status",l:"Status",w:110,type:"select",opts:["To read","Using","Reference","Done","Archived"]},
     {k:"date",l:"Date",w:104},{k:"notes",l:"Notes",w:300},
+  ],
+  projectLog: [
+    {k:"project",l:"Project key",w:120},{k:"date",l:"Date",w:104},
+    {k:"kind",l:"Kind",w:110,type:"select",opts:["Note","Update","Milestone","Decision","Blocker"]},
+    {k:"text",l:"Note / record",w:360},
   ],
 };
 
@@ -533,6 +538,7 @@ const seed = () => { const S = ({
     { _a:[], chapter:"6. Conclusion", status:"Not started", currentWords:0, targetWords:5000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"" },
   ],
   writingSessions: [],
+  projectLog: [],
   resources: [
     { _a:[], title:"Advance HE — Fellowship (overview & how to apply)", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://www.advance-he.ac.uk/fellowship", version:"", status:"To read", date:"", notes:"Start here — categories, descriptors (D1=AFHEA, D2=FHEA), application routes" },
     { _a:[], title:"Advance HE — Professional Standards Framework (PSF 2023)", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://www.advance-he.ac.uk/teaching-and-learning/psf", version:"", status:"To read", date:"", notes:"The Dimensions you map evidence to: Areas of Activity / Core Knowledge / Professional Values" },
@@ -1026,7 +1032,7 @@ function App() {
           : tab === "personal" ? <RoleSummaryTab data={data} role="Personal" icon="🌱" setTab={setTab} lang={lang} />
           : tab === "chula" ? <RoleSummaryTab data={data} role="Chula Lecturer" icon="🏛️" setTab={setTab} lang={lang} />
           : tab === "pgta" ? <RoleSummaryTab data={data} role="BSSC PGTA" icon="🎒" setTab={setTab} lang={lang} />
-          : tab === "projects" ? <ProjectsTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
+          : tab === "projects" ? <ProjectsTab data={data} setData={setData} update={update} addRow={addRow} addRowWith={addRowWith} delRow={delRow} exportCSV={exportCSV} pushUndo={pushUndo} setTab={setTab} setGroup={setGroup} lang={lang} />
           : tab === "tasks" ? <TasksBoard data={data} update={update} addRowWith={addRowWith} delRow={delRow} setRow={setRow} exportCSV={exportCSV} pushUndo={pushUndo} lang={lang} />
           : tab === "unassigned" ? <RoleSummaryTab data={data} role="Unassigned" icon="📥" setTab={setTab} lang={lang} />
           : tab === "search" ? <SearchResults data={data} q={searchQ} setQ={setSearchQ} goSearch={goSearch} setTab={setTab} setGroup={setGroup} lang={lang} />
@@ -1039,7 +1045,7 @@ function App() {
 }
 
 // ---- Trash bin: view / restore / empty soft-deleted rows ----
-const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence", resources: "Resources", phdResources: "PhD Resources", writingSessions: "Writing sessions", thesis: "Thesis chapters" };
+const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence", resources: "Resources", phdResources: "PhD Resources", writingSessions: "Writing sessions", thesis: "Thesis chapters", projectLog: "Project notes" };
 function trashLabel(row) {
   if (!row || typeof row !== "object") return "(item)";
   const v = row.activity || row.name || row.title || row.task || row.event || row.paper || row.agenda || row.idea || row.reflection || (row.first ? `${row.first} ${row.last || ""}`.trim() : "") || "";
@@ -1125,29 +1131,156 @@ function RoleSummaryTab({ data, role, icon, setTab, lang }) {
   );
 }
 
-function ProjectsTab({ data, update, addRow, delRow, exportCSV, lang }) {
+const projKey = p => String((p && (p.key || p.title)) || "").trim();
+const splitChips = s => String(s || "").split(/\s*[;,]\s*/).map(x => x.trim()).filter(Boolean);
+const linkedTasks = (data, key) => { const k = key.toLowerCase(); return (data.tasks || []).map((t, i) => ({ t, i })).filter(o => k && String(o.t.category || "").toLowerCase().includes(k)); };
+const linkedResources = (data, key) => { const k = key.toLowerCase(); return (data.resources || []).map((r, i) => ({ r, i })).filter(o => k && splitChips((o.r.forwhat || "") + "," + (o.r.tags || "")).some(t => t.toLowerCase() === k)); };
+const linkedLog = (data, key) => { const k = key.toLowerCase(); return (data.projectLog || []).map((l, i) => ({ l, i })).filter(o => String(o.l.project || "").toLowerCase() === k).sort((a, b) => String(b.l.date || "").localeCompare(String(a.l.date || ""))); };
+
+function ProjectsTab({ data, setData, update, addRow, addRowWith, delRow, exportCSV, pushUndo, setTab, setGroup, lang }) {
   const [roleF, setRoleF] = useState("all");
+  const [openIdx, setOpenIdx] = useState(null);
   const T = (th, en) => lang === "th" ? th : en;
   const projects = data.projects || [];
+  if (openIdx != null && projects[openIdx]) return <ProjectDetail idx={openIdx} data={data} setData={setData} update={update} addRowWith={addRowWith} delRow={delRow} pushUndo={pushUndo} setTab={setTab} setGroup={setGroup} back={() => setOpenIdx(null)} lang={lang} />;
   const countFor = k => k === "all" ? projects.length : projects.filter(p => hasRole(p, k)).length;
-  const shown = roleF === "all" ? projects : projects.filter(p => hasRole(p, roleF));
-  const byStatus = ["Active", "Planned", "On hold", "Idea", "Completed", "Dropped"].map(s => ({ s, n: shown.filter(p => p.status === s).length })).filter(x => x.n);
+  const indexed = projects.map((p, i) => ({ p, i })).filter(o => roleF === "all" || hasRole(o.p, roleF));
+  const byStatus = ["Active", "Planned", "On hold", "Idea", "Completed", "Dropped"].map(s => ({ s, n: indexed.filter(o => o.p.status === s).length })).filter(x => x.n);
+  const addProject = () => { if (pushUndo) pushUndo(); addRowWith("projects", { title: T("โปรเจกต์ใหม่", "New project"), key: "", role: roleF === "all" ? "PhD" : roleF, status: "Active", start: new Date().toISOString().slice(0, 10) }); setOpenIdx(projects.length); };
   return (
     <div>
-      <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>📁 {T("โปรเจกต์ทั้งหมด", "All projects")}</div>
-      <div style={{ fontSize: 12, color: GREY, marginBottom: 12 }}>{T("รวมโปรเจกต์ทุกหมวกไว้ที่เดียว — แท็กบทบาท (PhD / BSSC Lecturer / Chula Lecturer / Personal …) แล้วกรองดูได้", "Every project in one place — tag a role (PhD / BSSC Lecturer / Chula Lecturer / Personal …) and filter.")}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: AUB }}>📁 {T("โปรเจกต์ทั้งหมด", "All projects")}</div>
+          <div style={{ fontSize: 12, color: GREY, marginBottom: 12 }}>{T("คลิกโปรเจกต์เพื่อเปิดหน้ารายละเอียด — โน้ต, งาน (Tasks) และแหล่งข้อมูลที่ลิงก์ไว้จะรวมอยู่ในนั้น", "Click a project to open its page — its notes, linked tasks, and resources are gathered there.")}</div>
+        </div>
+        <button onClick={addProject} style={{ border: `1px solid ${AUB}`, background: "#fff", color: AUB, borderRadius: 7, padding: "6px 13px", cursor: "pointer", fontSize: 12, fontWeight: 700, flex: "0 0 auto" }}>＋ {T("เพิ่มโปรเจกต์", "Add project")}</button>
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         {[["all", T("ทั้งหมด", "All")], ...ROLES.map(r => [r, roleLab(lang, r)])].map(([k, lb]) => (
           <button key={k} onClick={() => setRoleF(k)} style={{ border: `1px solid ${roleF === k ? AUB : BORDER}`, background: roleF === k ? (k === "all" ? AUB : roleColor(k)) : "#fff", color: roleF === k ? "#fff" : AUB2, borderRadius: 999, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: roleF === k ? 700 : 500 }}>{lb} <span style={{ opacity: 0.7 }}>{countFor(k)}</span></button>
         ))}
       </div>
       {byStatus.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{byStatus.map(({ s, n }) => (<span key={s} style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: STAT_COLOR[s] || GREY, borderRadius: 6, padding: "3px 9px" }}>{s} · {n}</span>))}</div>}
-      <TableTab tabKey="projects" data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} filterRole={roleF} sortKey="start" sortDir="desc" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+        {indexed.map(({ p, i }) => {
+          const key = projKey(p); const nt = linkedTasks(data, key).length; const nr = linkedResources(data, key).length; const nn = linkedLog(data, key).length;
+          const sc = STAT_COLOR[p.status] || GREY;
+          return (
+            <div key={i} onClick={() => setOpenIdx(i)} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${sc}`, borderRadius: 10, padding: 12, cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: AUB, flex: 1, lineHeight: 1.3 }}>{p.title || "—"}</span>
+                {p.status && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#fff", background: sc, borderRadius: 4, padding: "1px 6px", flex: "0 0 auto" }}>{p.status}</span>}
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+                {splitChips(p.role).map(r => <span key={r} style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: roleColor(r), borderRadius: 5, padding: "1px 7px" }}>{roleLab(lang, r)}</span>)}
+                {key && <span style={{ fontSize: 10, fontWeight: 700, color: AUB2, background: CARD, borderRadius: 5, padding: "1px 7px" }}>#{key}</span>}
+              </div>
+              <div style={{ display: "flex", gap: 10, fontSize: 11, color: GREY }}>
+                <span>📝 {nn}</span><span>✅ {nt}</span><span>🔖 {nr}</span>
+              </div>
+            </div>
+          );
+        })}
+        {indexed.length === 0 && <div style={{ fontSize: 12, color: GREY, padding: 20 }}>{T("ยังไม่มีโปรเจกต์ในหมวดนี้", "No projects in this filter.")}</div>}
+      </div>
     </div>
   );
 }
 
-const SEARCH_STORES = ["activity", "tasks", "projects", "resources", "phdResources", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
+function ProjectDetail({ idx, data, setData, update, addRowWith, delRow, pushUndo, setTab, setGroup, back, lang }) {
+  const th = lang === "th";
+  const p = (data.projects || [])[idx];
+  if (!p) return <div style={{ padding: 20 }}><button onClick={back} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 6, padding: "6px 12px", cursor: "pointer" }}>← {th ? "กลับ" : "Back"}</button></div>;
+  const key = projKey(p);
+  const today = new Date().toISOString().slice(0, 10);
+  const upd = (k, v) => update("projects", idx, k, v);
+  const firstRole = splitChips(p.role)[0] || "PhD";
+  const tasks = linkedTasks(data, key);
+  const res = linkedResources(data, key);
+  const log = linkedLog(data, key);
+  const needKey = () => { if (key) return true; window.alert(th ? "ตั้งช่อง Key ของโปรเจกต์ก่อน (เช่น AFHEA) เพื่อลิงก์งาน/แหล่งข้อมูล" : "Set the project's Key first (e.g. AFHEA) so tasks/resources can link to it."); return false; };
+  const addNote = () => { if (!needKey()) return; if (pushUndo) pushUndo(); addRowWith("projectLog", { project: key, date: today, kind: "Note", text: "" }); };
+  const addTask = () => { if (!needKey()) return; if (pushUndo) pushUndo(); addRowWith("tasks", { title: "", status: "Not started", role: firstRole, category: key, due: "", notes: "" }); };
+  const addRes = () => { if (!needKey()) return; if (pushUndo) pushUndo(); addRowWith("resources", { title: "", type: "Reference", forwhat: key, role: firstRole, link: "", version: "", status: "To read", date: "", notes: "" }); };
+  const inp = { border: `1px solid ${BORDER}`, borderRadius: 6, padding: "6px 9px", fontSize: 13, boxSizing: "border-box" };
+  const secH = (icon, label, n, onAdd) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 8px" }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: AUB }}>{icon} {label} <span style={{ color: GREY, fontWeight: 400 }}>· {n}</span></div>
+      <button onClick={onAdd} style={{ border: "none", background: AUB, color: "#fff", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 11.5, fontWeight: 700 }}>＋ {th ? "เพิ่ม" : "Add"}</button>
+    </div>
+  );
+  const sc = STAT_COLOR[p.status] || GREY;
+  return (
+    <div>
+      <button onClick={back} style={{ border: `1px solid ${BORDER}`, background: "#fff", color: AUB2, borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12, marginBottom: 12 }}>← {th ? "กลับไปโปรเจกต์ทั้งหมด" : "All projects"}</button>
+
+      {/* header / fields */}
+      <div style={{ background: CARD, borderRadius: 12, padding: 16 }}>
+        <input value={p.title || ""} onChange={e => upd("title", e.target.value)} placeholder={th ? "ชื่อโปรเจกต์" : "Project title"} style={{ width: "100%", border: "none", background: "transparent", fontSize: 18, fontWeight: 800, color: AUB, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ fontSize: 11, color: AUB2, fontWeight: 700 }}>Key <input value={p.key || ""} onChange={e => upd("key", e.target.value)} placeholder="AFHEA" title={th ? "รหัสสั้นสำหรับลิงก์งาน/แหล่งข้อมูล" : "short key used to link tasks & resources"} style={{ ...inp, width: 100, marginLeft: 4 }} /></label>
+          <select value={p.status || "Active"} onChange={e => upd("status", e.target.value)} style={{ ...inp, color: "#fff", background: sc, fontWeight: 700, cursor: "pointer", border: `1px solid ${sc}` }}>{["Idea", "Planned", "Active", "On hold", "Completed", "Dropped"].map(s => <option key={s} value={s} style={{ color: INK, background: "#fff" }}>{s}</option>)}</select>
+          <label style={{ fontSize: 11, color: AUB2, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>{th ? "เริ่ม" : "Start"} <DateCell value={p.start} onChange={v => upd("start", v)} common={{ ...inp, width: "12ch" }} /></label>
+          <label style={{ fontSize: 11, color: AUB2, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>{th ? "เป้าหมาย" : "Target"} <DateCell value={p.end} onChange={v => upd("end", v)} common={{ ...inp, width: "12ch" }} /></label>
+        </div>
+        <div style={{ marginTop: 8 }}><RoleTagCell value={p.role} onChange={v => upd("role", v)} lang={lang} /></div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input value={p.category || ""} onChange={e => upd("category", e.target.value)} placeholder={th ? "ประเภท / พื้นที่งาน" : "area / type"} style={{ ...inp, flex: "1 1 140px" }} />
+          <input value={p.link || ""} onChange={e => upd("link", e.target.value)} placeholder={th ? "ลิงก์ / ที่อยู่ไฟล์" : "link / location"} style={{ ...inp, flex: "1 1 180px" }} />
+          {p.link && /^https?:\/\//i.test(String(p.link).trim()) && <a href={String(p.link).trim()} target="_blank" rel="noopener noreferrer" style={{ color: AUB, fontWeight: 700, fontSize: 14 }}>↗</a>}
+        </div>
+        <textarea value={p.notes || ""} onChange={e => upd("notes", e.target.value)} rows={2} placeholder={th ? "สรุป / คำอธิบายโปรเจกต์" : "summary / description"} style={{ ...inp, width: "100%", marginTop: 8, resize: "vertical" }} />
+      </div>
+
+      {/* notes / log */}
+      {secH("📝", th ? "โน้ต & บันทึก" : "Notes & records", log.length, addNote)}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {log.map(({ l, i }) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px" }}>
+            <DateCell value={l.date} onChange={v => update("projectLog", i, "date", v)} common={{ ...inp, width: "11ch", fontSize: 11, padding: "3px 6px" }} />
+            <select value={l.kind || "Note"} onChange={e => update("projectLog", i, "kind", e.target.value)} style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: "3px 6px", fontSize: 11, cursor: "pointer", flex: "0 0 auto" }}>{["Note", "Update", "Milestone", "Decision", "Blocker"].map(k => <option key={k} value={k}>{k}</option>)}</select>
+            <textarea value={l.text || ""} onChange={e => update("projectLog", i, "text", e.target.value)} rows={1} placeholder={th ? "บันทึก…" : "note / record…"} style={{ flex: 1, border: "none", outline: "none", resize: "vertical", fontSize: 12.5, fontFamily: "inherit", background: "transparent", lineHeight: 1.4 }} />
+            <button onClick={() => delRow("projectLog", i)} style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 14 }}>×</button>
+          </div>
+        ))}
+        {log.length === 0 && <div style={{ fontSize: 11.5, color: GREY, padding: "6px 2px" }}>{th ? "ยังไม่มีโน้ต" : "No notes yet."}</div>}
+      </div>
+
+      {/* linked tasks */}
+      {secH("✅", th ? "งานที่ลิงก์ (Tasks)" : "Linked tasks", tasks.length, addTask)}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {tasks.map(({ t, i }) => { const done = t.status === "Done"; return (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px" }}>
+            <input type="checkbox" checked={done} onChange={e => update("tasks", i, "status", e.target.checked ? "Done" : "Not started")} style={{ cursor: "pointer" }} />
+            <input value={t.title || ""} onChange={e => update("tasks", i, "title", e.target.value)} placeholder={th ? "ชื่องาน" : "task"} style={{ flex: 1, border: "none", outline: "none", fontSize: 12.5, fontWeight: 600, color: done ? GREY : INK, textDecoration: done ? "line-through" : "none", background: "transparent" }} />
+            <select value={t.status || "Not started"} onChange={e => update("tasks", i, "status", e.target.value)} style={{ border: `1px solid ${STAT_COLOR[t.status] || BORDER}`, color: STAT_COLOR[t.status] ? "#fff" : AUB2, background: STAT_COLOR[t.status] || "#fff", fontWeight: 700, borderRadius: 5, padding: "3px 6px", fontSize: 10.5, cursor: "pointer" }}>{["Not started", "In progress", "Awaiting", "Done"].map(s => <option key={s} value={s} style={{ color: INK, background: "#fff" }}>{s}</option>)}</select>
+            <DateCell value={t.due} onChange={v => update("tasks", i, "due", v)} common={{ ...inp, width: "11ch", fontSize: 11, padding: "3px 6px", color: (t.due && t.due < today && !done) ? RED : AUB2 }} />
+            <button onClick={() => { if (window.confirm(th ? "ลบงานนี้? (ย้ายไปถังขยะ)" : "Delete this task?")) delRow("tasks", i); }} style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 14 }}>×</button>
+          </div>
+        ); })}
+        {tasks.length === 0 && <div style={{ fontSize: 11.5, color: GREY, padding: "6px 2px" }}>{th ? `ยังไม่มีงานที่ category = "${key || "…"}"` : `No tasks with category "${key || "…"}" yet.`}</div>}
+      </div>
+
+      {/* linked resources */}
+      {secH("🔖", th ? "แหล่งข้อมูลที่ลิงก์" : "Linked resources", res.length, addRes)}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {res.map(({ r, i }) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px" }}>
+            <input value={r.title || ""} onChange={e => update("resources", i, "title", e.target.value)} placeholder={th ? "ชื่อแหล่งข้อมูล" : "resource"} style={{ flex: 1, border: "none", outline: "none", fontSize: 12.5, fontWeight: 600, color: AUB, background: "transparent" }} />
+            <span style={{ fontSize: 10, color: GREY }}>{r.type || ""}</span>
+            {r.status && <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: STAT_COLOR[r.status] || GREY, borderRadius: 5, padding: "1px 7px" }}>{r.status}</span>}
+            {r.link && /^https?:\/\//i.test(String(r.link).trim()) && <a href={String(r.link).trim()} target="_blank" rel="noopener noreferrer" style={{ color: AUB, fontWeight: 700, fontSize: 14 }}>↗</a>}
+            <button onClick={() => { if (window.confirm(th ? "ลบแหล่งข้อมูลนี้?" : "Delete this resource?")) delRow("resources", i); }} style={{ border: "none", background: "transparent", color: GREY, cursor: "pointer", fontSize: 14 }}>×</button>
+          </div>
+        ))}
+        {res.length === 0 && <div style={{ fontSize: 11.5, color: GREY, padding: "6px 2px" }}>{th ? `ยังไม่มีแหล่งข้อมูลที่แท็ก "${key || "…"}" — ไปที่แท็บ Resources แล้วใส่ "${key || "…"}" ในช่อง For` : `No resources tagged "${key || "…"}" — add "${key || "…"}" to a resource's For field.`}</div>}
+      </div>
+    </div>
+  );
+}
+
+const SEARCH_STORES = ["activity", "tasks", "projects", "projectLog", "resources", "phdResources", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
 function SearchResults({ data, q, setQ, goSearch, setTab, setGroup, lang }) {
   const T = (th, en) => lang === "th" ? th : en;
   const query = (q || "").trim().toLowerCase();
