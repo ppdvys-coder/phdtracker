@@ -1376,6 +1376,20 @@ function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortK
     });
   }
   const toggleSort = k => { if (sortCol === k) { if (sortAsc) setSortAsc(false); else { setSortCol(null); setSortAsc(true); } } else { setSortCol(k); setSortAsc(true); } };
+  // size each column to its longest content (in ch), clamped — URLs stay capped so they don't blow out the row
+  const colStyle = c => {
+    if (c.type === "link") return { minWidth: "16ch", width: "22ch", maxWidth: "24ch" };
+    if (isDateColumn(c)) return { minWidth: "12ch", width: "13ch", maxWidth: "14ch" }; // room for YYYY-MM-DD + 📅
+    const chip = c.type === "roles" || c.type === "people" || c.type === "tags";
+    const samples = [String(colLab(lang, c.l))];
+    rows.forEach(r => samples.push(cellText(r, c)));
+    if (c.type === "select" && c.opts) c.opts.forEach(o => samples.push(o));
+    let maxLen = 3;
+    samples.forEach(s => String(s == null ? "" : s).split("\n").forEach(line => { if (line.length > maxLen) maxLen = line.length; }));
+    let ch = Math.min(Math.max(maxLen + 2, 5), 42);
+    if (chip) ch = Math.min(ch + 4, 34);
+    return { minWidth: ch + "ch", width: ch + "ch", maxWidth: "42ch" };
+  };
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
@@ -1386,10 +1400,10 @@ function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortK
         <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{view.length !== rows.length ? `${view.length}/${rows.length} · ` : ""}{lang === "th" ? "คลิกหัวตารางเพื่อเรียง" : "click a header to sort"}</span>
       </div>
       <div style={{ overflowX: "auto", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+        <table style={{ borderCollapse: "collapse", width: "auto", maxWidth: "100%", tableLayout: "auto", fontSize: 12 }}>
           <thead>
             <tr>
-              {cs.map(c => (<th key={c.k} onClick={() => toggleSort(c.k)} title={lang === "th" ? "คลิกเพื่อเรียง" : "click to sort"} style={{ background: AUB, color: "#fff", textAlign: "left", padding: "8px", fontWeight: 700, minWidth: c.w, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>{colLab(lang, c.l)}{sortCol === c.k ? (sortAsc ? " ▲" : " ▼") : ""}</th>))}
+              {cs.map(c => (<th key={c.k} onClick={() => toggleSort(c.k)} title={lang === "th" ? "คลิกเพื่อเรียง" : "click to sort"} style={{ background: AUB, color: "#fff", textAlign: "left", padding: "8px", fontWeight: 700, ...colStyle(c), cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>{colLab(lang, c.l)}{sortCol === c.k ? (sortAsc ? " ▲" : " ▼") : ""}</th>))}
               <th style={{ background: AUB, width: 34 }} />
             </tr>
             {showFilters && <tr>
