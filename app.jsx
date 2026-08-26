@@ -341,6 +341,13 @@ const cols = {
     {k:"status",l:"Status",w:110,type:"select",opts:["To read","Using","Draft","In review","Final","Archived"]},
     {k:"date",l:"Date",w:104},{k:"notes",l:"Notes",w:280},
   ],
+  phdResources: [
+    {k:"title",l:"Resource",w:250},
+    {k:"category",l:"Category",w:160,type:"select",opts:["Research content","Guidance / procedure","Method / tool","Reading list","Training","Admin / form","Other"]},
+    {k:"link",l:"Link / location",w:240,type:"link"},{k:"source",l:"Source",w:150,type:"tags"},
+    {k:"status",l:"Status",w:110,type:"select",opts:["To read","Using","Reference","Done","Archived"]},
+    {k:"date",l:"Date",w:104},{k:"notes",l:"Notes",w:300},
+  ],
 };
 
 const row = (keys, vals, a=[]) => { const o={_a:a}; keys.forEach((k,i)=>o[k]=vals[i]??""); return o; };
@@ -529,11 +536,17 @@ const seed = () => { const S = ({
   resources: [
     { _a:[], title:"Advance HE — Fellowship (overview & how to apply)", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://www.advance-he.ac.uk/fellowship", version:"", status:"To read", date:"", notes:"Start here — categories, descriptors (D1=AFHEA, D2=FHEA), application routes" },
     { _a:[], title:"Advance HE — Professional Standards Framework (PSF 2023)", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://www.advance-he.ac.uk/teaching-and-learning/psf", version:"", status:"To read", date:"", notes:"The Dimensions you map evidence to: Areas of Activity / Core Knowledge / Professional Values" },
-    { _a:[], title:"UCL Arena — UCL's supported route to Advance HE fellowship", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer, BSSC PGTA", link:"https://www.ucl.ac.uk/teaching-learning/", version:"", status:"To read", date:"", notes:"⚠ find exact UCL Arena page — UCL's accredited scheme + mentors/assessors" },
-    { _a:[], title:"AFHEA application — official template / structure", type:"Template", forwhat:"AFHEA", role:"BSSC PGTA", link:"", version:"", status:"To read", date:"", notes:"Paste the Advance HE / UCL Arena AFHEA template link or file here" },
-    { _a:[], title:"Sample AFHEA / FHEA application (exemplar)", type:"Sample / example", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"", version:"", status:"To read", date:"", notes:"Add a link to a good exemplar you find" },
-    { _a:[], title:"My AFHEA application", type:"My draft", forwhat:"AFHEA", role:"BSSC PGTA", link:"", version:"v1", status:"Draft", date:"", notes:"Your working draft — put the OneDrive / Word link here; bump the version each round" },
-    { _a:[], title:"Fellowship planning doc", type:"Reference", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://claude.ai/share/ce80660c-f60d-451d-a1cd-97181fa9ad7f", version:"", status:"Using", date:"", notes:"The planning conversation (linked from the AFHEA→FHEA project)" },
+    { _a:[], title:"UCL Arena — route to fellowship (Moodle)", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer, BSSC PGTA", link:"https://moodle.ucl.ac.uk/course/view.php?id=41922", version:"", status:"To read", date:"", notes:"UCL's supported/accredited route + mentors — the Arena Moodle course" },
+    { _a:[], title:"AFHEA — official application template (D1, PSF 2023)", type:"Template", forwhat:"AFHEA", role:"BSSC PGTA", link:"", version:"", status:"Using", date:"", notes:"Word template on my OneDrive → paste the file path in Link (kept private, not in the public site)" },
+    { _a:[], title:"FHEA — official application template (D2, PSF 2023)", type:"Template", forwhat:"FHEA", role:"BSSC Lecturer", link:"", version:"", status:"To read", date:"", notes:"Word template on my OneDrive → paste the file path in Link (kept private, not in the public site)" },
+    { _a:[], title:"Sample AFHEA / FHEA applications", type:"Sample / example", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"", version:"", status:"Reference", date:"", notes:"On my OneDrive — ARENA fellowship folder" },
+    { _a:[], title:"My AFHEA application", type:"My draft", forwhat:"AFHEA", role:"BSSC PGTA", link:"", version:"v1", status:"Draft", date:"", notes:"Working draft — paste the OneDrive / Word link here; bump the version each round" },
+    { _a:[], title:"↩ Back to the Claude planning conversation", type:"Reference", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://claude.ai/share/ce80660c-f60d-451d-a1cd-97181fa9ad7f", version:"", status:"Using", date:"", notes:"Reopen the fellowship planning conversation anytime" },
+  ],
+  phdResources: [
+    { _a:[], title:"Typical Timetable for a Full-time PhD", category:"Guidance / procedure", link:"https://www.ucl.ac.uk/study/doctoral-school/rights-and-responsibilities/graduate-research-degrees-code-practice#crss", source:"UCL Doctoral School", status:"Reference", date:"", notes:"Term-by-term milestones (upgrade, submission, viva) — Code of Practice §CRSS" },
+    { _a:[], title:"UCL Graduate Research Degrees — Code of Practice", category:"Guidance / procedure", link:"https://www.ucl.ac.uk/study/doctoral-school/rights-and-responsibilities/graduate-research-degrees-code-practice", source:"UCL Doctoral School", status:"Reference", date:"", notes:"Rights & responsibilities, supervision, upgrade, examination" },
+    { _a:[], title:"(add key papers / frameworks / datasets here)", category:"Research content", link:"", source:"", status:"To read", date:"", notes:"CREM · smart campus · digital readiness · CREM/FM sources" },
   ],
   projects: STARTER_PROJECTS.map(p => ({ ...p })),
   teachingSessions: [],
@@ -579,6 +592,7 @@ const TABS = [
   {k:"publications", group:"phd", ic:"📄", en:"Publications", th:"ผลงานตีพิมพ์"},
   {k:"supervisor", group:"phd", ic:"🧑‍🏫", en:"Supervisor", th:"อาจารย์ที่ปรึกษา"},
   {k:"events", group:"phd", ic:"🎓", en:"Events & Training", th:"กิจกรรม & อบรม"},
+  {k:"phdResources", group:"phd", ic:"📓", en:"PhD Resources", th:"แหล่งข้อมูล PhD"},
   {k:"lecdash", group:"bssc", ic:"🍎", en:"Lecturer Dashboard", th:"แดชบอร์ดอาจารย์"},
   {k:"teachingSessions", group:"bssc", ic:"📚", en:"Teaching Sessions", th:"คาบสอน"},
   {k:"guestLectures", group:"bssc", ic:"🎤", en:"Guest Lectures", th:"บรรยายรับเชิญ"},
@@ -1023,7 +1037,7 @@ function App() {
 }
 
 // ---- Trash bin: view / restore / empty soft-deleted rows ----
-const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence", resources: "Resources", writingSessions: "Writing sessions", thesis: "Thesis chapters" };
+const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence", resources: "Resources", phdResources: "PhD Resources", writingSessions: "Writing sessions", thesis: "Thesis chapters" };
 function trashLabel(row) {
   if (!row || typeof row !== "object") return "(item)";
   const v = row.activity || row.name || row.title || row.task || row.event || row.paper || row.agenda || row.idea || row.reflection || (row.first ? `${row.first} ${row.last || ""}`.trim() : "") || "";
@@ -1131,7 +1145,7 @@ function ProjectsTab({ data, update, addRow, delRow, exportCSV, lang }) {
   );
 }
 
-const SEARCH_STORES = ["activity", "tasks", "projects", "resources", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
+const SEARCH_STORES = ["activity", "tasks", "projects", "resources", "phdResources", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
 function SearchResults({ data, q, setQ, goSearch, setTab, setGroup, lang }) {
   const T = (th, en) => lang === "th" ? th : en;
   const query = (q || "").trim().toLowerCase();
