@@ -98,7 +98,8 @@ const TSTAT = ["Not started","In progress","Completed","Blocked"];
 const STAT_COLOR = { "Completed":GREEN,"In progress":AMBER,"Not started":GREY,"Blocked":RED,"Attended":GREEN,"Presented":GREEN,
   "Registered":AMBER,"Abstract submitted":AMBER,"Idea":GREY,"Accepted":GREEN,"Under review":AMBER,"Submitted":AMBER,
   "Drafting":GREY,"Outline":GREY,"Planned":GREY,"Revisions":AMBER,"Rejected":RED,"Yes":AMBER,"No":GREY,
-  "Done":GREEN,"Awaiting":AMBER,"New":GREY,"Exploring":AMBER,"Parked":GREY,"Using":GREEN,"Dropped":RED,"Active":GREEN,"On hold":AMBER };
+  "Done":GREEN,"Awaiting":AMBER,"New":GREY,"Exploring":AMBER,"Parked":GREY,"Using":GREEN,"Dropped":RED,"Active":GREEN,"On hold":AMBER,
+  "To read":GREY,"Draft":AMBER,"In review":AMBER,"Final":GREEN,"Archived":"#9E9E9E" };
 
 // ---- Thesis writing ----
 const THESIS_STATUS = ["Not started","Outlining","Drafting","Revising","Done"];
@@ -332,6 +333,14 @@ const cols = {
     {k:"date",l:"Date",w:104},{k:"chapter",l:"Chapter",w:200},{k:"wordsWritten",l:"Words written",w:110,type:"number"},
     {k:"minutes",l:"Minutes",w:90,type:"number"},{k:"nextAction",l:"Next action",w:200},{k:"blocker",l:"Blocker",w:180},{k:"note",l:"Note",w:200},
   ],
+  resources: [
+    {k:"title",l:"Resource",w:240},
+    {k:"type",l:"Type",w:150,type:"select",opts:["Official guidance","Template","Sample / example","My draft","Reference","Video / course","Other"]},
+    {k:"forwhat",l:"For",w:130,type:"tags"},{k:"role",l:"Hat",w:120,type:"roles"},
+    {k:"link",l:"Link / location",w:240,type:"link"},{k:"version",l:"Version",w:80},
+    {k:"status",l:"Status",w:110,type:"select",opts:["To read","Using","Draft","In review","Final","Archived"]},
+    {k:"date",l:"Date",w:104},{k:"notes",l:"Notes",w:280},
+  ],
 };
 
 const row = (keys, vals, a=[]) => { const o={_a:a}; keys.forEach((k,i)=>o[k]=vals[i]??""); return o; };
@@ -517,6 +526,15 @@ const seed = () => { const S = ({
     { _a:[], chapter:"6. Conclusion", status:"Not started", currentWords:0, targetWords:5000, supervisorRound:0, lastSubmitted:"", fileLink:"", notes:"" },
   ],
   writingSessions: [],
+  resources: [
+    { _a:[], title:"Advance HE — Fellowship (overview & how to apply)", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://www.advance-he.ac.uk/fellowship", version:"", status:"To read", date:"", notes:"Start here — categories, descriptors (D1=AFHEA, D2=FHEA), application routes" },
+    { _a:[], title:"Advance HE — Professional Standards Framework (PSF 2023)", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://www.advance-he.ac.uk/teaching-and-learning/psf", version:"", status:"To read", date:"", notes:"The Dimensions you map evidence to: Areas of Activity / Core Knowledge / Professional Values" },
+    { _a:[], title:"UCL Arena — UCL's supported route to Advance HE fellowship", type:"Official guidance", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer, BSSC PGTA", link:"https://www.ucl.ac.uk/teaching-learning/", version:"", status:"To read", date:"", notes:"⚠ find exact UCL Arena page — UCL's accredited scheme + mentors/assessors" },
+    { _a:[], title:"AFHEA application — official template / structure", type:"Template", forwhat:"AFHEA", role:"BSSC PGTA", link:"", version:"", status:"To read", date:"", notes:"Paste the Advance HE / UCL Arena AFHEA template link or file here" },
+    { _a:[], title:"Sample AFHEA / FHEA application (exemplar)", type:"Sample / example", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"", version:"", status:"To read", date:"", notes:"Add a link to a good exemplar you find" },
+    { _a:[], title:"My AFHEA application", type:"My draft", forwhat:"AFHEA", role:"BSSC PGTA", link:"", version:"v1", status:"Draft", date:"", notes:"Your working draft — put the OneDrive / Word link here; bump the version each round" },
+    { _a:[], title:"Fellowship planning doc", type:"Reference", forwhat:"AFHEA, FHEA", role:"BSSC Lecturer", link:"https://claude.ai/share/ce80660c-f60d-451d-a1cd-97181fa9ad7f", version:"", status:"Using", date:"", notes:"The planning conversation (linked from the AFHEA→FHEA project)" },
+  ],
   projects: STARTER_PROJECTS.map(p => ({ ...p })),
   teachingSessions: [],
   guestLectures: [
@@ -547,6 +565,7 @@ const TABS = [
   {k:"outputs", group:"overview", ic:"📦", en:"Outputs", th:"ผลงาน"},
   {k:"ideas", group:"overview", ic:"💡", en:"Ideas", th:"ไอเดีย"},
   {k:"projects", group:"overview", ic:"📁", en:"Projects", th:"โปรเจกต์"},
+  {k:"resources", group:"overview", ic:"🔖", en:"Resources", th:"แหล่งข้อมูล"},
   {k:"unassigned", group:"overview", ic:"📥", en:"Unassigned", th:"ยังไม่จัดหมวด"},
   {k:"search", group:"overview", ic:"🔎", en:"Search", th:"ค้นหา"},
   {k:"contacts", group:"overview", ic:"👥", en:"Contacts", th:"ผู้ติดต่อ"},
@@ -1004,7 +1023,7 @@ function App() {
 }
 
 // ---- Trash bin: view / restore / empty soft-deleted rows ----
-const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence" };
+const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence", resources: "Resources", writingSessions: "Writing sessions", thesis: "Thesis chapters" };
 function trashLabel(row) {
   if (!row || typeof row !== "object") return "(item)";
   const v = row.activity || row.name || row.title || row.task || row.event || row.paper || row.agenda || row.idea || row.reflection || (row.first ? `${row.first} ${row.last || ""}`.trim() : "") || "";
@@ -1112,7 +1131,7 @@ function ProjectsTab({ data, update, addRow, delRow, exportCSV, lang }) {
   );
 }
 
-const SEARCH_STORES = ["activity", "tasks", "projects", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
+const SEARCH_STORES = ["activity", "tasks", "projects", "resources", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
 function SearchResults({ data, q, setQ, goSearch, setTab, setGroup, lang }) {
   const T = (th, en) => lang === "th" ? th : en;
   const query = (q || "").trim().toLowerCase();
@@ -1386,6 +1405,11 @@ function TableTab({ tabKey, data, update, addRow, delRow, exportCSV, lang, sortK
                         <input type="number" min="0" max="100" value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, textAlign: "center" }} />
                       ) : isDateColumn(c) ? (
                         <DateCell value={r[c.k]} onChange={v => update(tabKey, i, c.k, v)} common={common} />
+                      ) : c.type === "link" ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <textarea rows={1} value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} placeholder={lang === "th" ? "วางลิงก์ / ที่อยู่ไฟล์" : "paste URL / file path"} style={{ ...common, resize: "vertical", lineHeight: 1.35, flex: 1 }} />
+                          {r[c.k] && /^https?:\/\//i.test(String(r[c.k]).trim()) && <a href={String(r[c.k]).trim()} target="_blank" rel="noopener noreferrer" title={lang === "th" ? "เปิดลิงก์" : "open"} style={{ color: AUB, fontWeight: 700, textDecoration: "none", flex: "0 0 auto", padding: "0 3px", fontSize: 14 }}>↗</a>}
+                        </div>
                       ) : (
                         <textarea rows={1} value={r[c.k]} onChange={e => update(tabKey, i, c.k, e.target.value)} style={{ ...common, resize: "vertical", lineHeight: 1.35 }} />
                       )}
@@ -2844,6 +2868,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
     { k: "idea", e: "💡", c: "#2E7D32", en: "Add Idea", th: "เพิ่มไอเดีย", d: lang === "th" ? "จับความคิดไว้ก่อน" : "capture a thought", go: () => quickAdd("ideas", { role, date: today, status: "New" }) },
     { k: "project", e: "📁", c: "#1565C0", en: "Add Project", th: "เพิ่มโปรเจกต์", d: lang === "th" ? "โปรเจกต์ใหม่ + แท็กหมวก" : "a project + role tag", go: () => quickAdd("projects", { role, status: "Active", start: today }) },
     { k: "writing", e: "✍️", c: AUB, en: "Add writing session", th: "บันทึกการเขียน", d: lang === "th" ? "นับคำ + จับเวลา → อัปเดตบทวิทยานิพนธ์" : "word count + timer → updates a thesis chapter", go: () => setShowSession(true) },
+    { k: "resource", e: "🔖", c: "#6B4E8C", en: "Add Resource", th: "เพิ่มแหล่งข้อมูล", d: lang === "th" ? "ลิงก์ / เทมเพลต / ตัวอย่าง / ดราฟต์ของเรา" : "URL / template / sample / your own draft", go: () => quickAdd("resources", { type: "Reference", role, status: "To read", date: today }) },
   ];
   const exportAll = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = `phd_dashboard_backup_${today}.json`; a.click(); URL.revokeObjectURL(url); };
   const importAll = e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const p = JSON.parse(r.result); if (p && typeof p === "object" && p.timeline && window.confirm(lang === "th" ? "แทนที่ข้อมูลทั้งหมดด้วยไฟล์นี้? (แนะนำให้สำรองก่อน)" : "Replace ALL current data with this file? (Export a backup first if unsure.)")) { if (pushUndo) pushUndo(); setData(p); } else if (!p.timeline) window.alert("This doesn't look like a dashboard backup file."); } catch (err) { window.alert(lang === "th" ? "อ่านไฟล์ JSON ไม่ได้" : "Could not read that file as JSON."); } }; r.readAsText(f); e.target.value = ""; };
