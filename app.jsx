@@ -1014,7 +1014,7 @@ function App() {
 
       <div style={{ padding: 18 }}>
         {tab === "dashboard" ? <Dashboard m={m} data={data} update={update} setTab={setTab} resetAll={resetAll} lang={lang} />
-          : tab === "interviews" ? <InterviewBoard data={data} update={update} setRow={setRow} addRowWith={addRowWith} delRow={delRow} exportCSV={exportCSV} lang={lang} />
+          : tab === "interviews" ? <InterviewBoard data={data} update={update} setRow={setRow} addRowWith={addRowWith} delRow={delRow} exportCSV={exportCSV} pushUndo={pushUndo} lang={lang} />
           : tab === "calendar" ? <CalendarTab data={data} setRow={setRow} addRowWith={addRowWith} delRow={delRow} setData={setData} setTab={setTab} setGroup={setGroup} lang={lang} />
           : tab === "cv" ? <CVTab data={data} setData={setData} lang={lang} />
           : tab === "plan" ? <ResearchPlanTab data={data} setData={setData} lang={lang} />
@@ -1834,7 +1834,7 @@ function TasksBoard({ data, update, addRowWith, delRow, setRow, exportCSV, pushU
   );
 }
 
-function InterviewBoard({ data, update, setRow, addRowWith, delRow, exportCSV, lang }) {
+function InterviewBoard({ data, update, setRow, addRowWith, delRow, exportCSV, pushUndo, lang }) {
   const [dragOver, setDragOver] = useState(null);
   const [editing, setEditing] = useState(null);
   const L = k => t(lang, k);
@@ -1868,6 +1868,15 @@ function InterviewBoard({ data, update, setRow, addRowWith, delRow, exportCSV, l
     setEditing(null);
   };
 
+  // ---- reconcile interview sessions from the Activity Log / Calendar ----
+  const inBoard = name => { const n = (name || "").toLowerCase().trim(); return !!n && rows.some(iv => { const f = `${iv.first || ""} ${iv.last || ""}`.trim().toLowerCase(); return f && (f.includes(n) || n.includes(f)); }); };
+  const personOfAct = a => { let p = (a.linked || "").split(/\s*[;,]\s*/)[0].trim(); if (!p) p = (a.activity || "").replace(/^\s*interview\s*[—:\-]\s*/i, "").replace(/\s*\(P?\d+\).*$/i, "").trim(); return p; };
+  const intGaps = (() => { const seen = {}, out = []; (data.activity || []).filter(a => (a.category || "") === "Interview").forEach(a => { const p = personOfAct(a); if (!p) return; const k = p.toLowerCase(); if (seen[k]) { if ((a.date || "") > seen[k].date) seen[k].date = a.date || ""; return; } const g = { name: p, date: a.date || "", board: inBoard(p), contact: hasContact(p) }; seen[k] = g; if (!g.board || !g.contact) out.push(g); }); return out.sort((x, y) => String(y.date).localeCompare(String(x.date))); })();
+  const splitNm = n => { const parts = n.trim().split(/\s+/); return { first: parts.length > 1 ? parts.slice(0, -1).join(" ") : (parts[0] || ""), last: parts.length > 1 ? parts[parts.length - 1] : "" }; };
+  const addGapBoard = g => { const { first, last } = splitNm(g.name); addRowWith("interviews", { _a: [], code: "", first, last, date: g.date, phase: "Interviewed", pis: false, consent: false, signed: false, qsent: false, interviewed: true, transcribed: false, note: "added from Activity Log" }); };
+  const addGapContact = g => addRowWith("contacts", { _a: [], name: g.name, role: "", org: "", category: "Interviewee", relevance: "", first: "", last: g.date, follow: "No", next: "", notes: "added from Activity Log", reltype: "", projconn: "", topics: "", importance: "", relfiles: "" });
+  const addAllGaps = () => { if (!intGaps.length) return; if (!window.confirm(lang === "th" ? `เติมให้ครบ ${intGaps.length} คนจาก Activity Log? (ลงทั้ง Interview board + Contacts เฉพาะที่ยังขาด)` : `Complete ${intGaps.length} people from the Activity Log? (adds to Interview board + Contacts where missing)`)) return; if (pushUndo) pushUndo(); intGaps.forEach(g => { if (!g.board) addGapBoard(g); if (!g.contact) addGapContact(g); }); };
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
@@ -1876,6 +1885,28 @@ function InterviewBoard({ data, update, setRow, addRowWith, delRow, exportCSV, l
         {missing.length > 0 && <button onClick={addMissingToContacts} title={lang === "th" ? "เพิ่มผู้เข้าร่วมที่ยังไม่มีในผู้ติดต่อ (หมวด Interviewee)" : "add participants who aren't in Contacts yet (as Interviewee)"} style={{ background: "#fff", color: AUB, border: `1px solid ${AUB}`, borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>👥 {lang === "th" ? `เพิ่มเข้าผู้ติดต่อ (${missing.length})` : `Add ${missing.length} to Contacts`}</button>}
         <span style={{ fontSize: 11, color: GREY, marginLeft: "auto" }}>{indexed.filter(o => o.e.code).length} {lang === "th" ? "ผู้เข้าร่วม (มีรหัส)" : "coded participants"}</span>
       </div>
+      {intGaps.length > 0 && (
+        <div style={{ background: "#FFF7E6", border: `1px solid ${AMBER}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: "#8a5a00" }}>🔗 {lang === "th" ? `พบ interview ${intGaps.length} คนจากปฏิทิน/Activity ที่ยังลงไม่ครบ` : `${intGaps.length} interview people from the Calendar/Activity Log aren't fully recorded`}</div>
+            <button onClick={addAllGaps} style={{ border: "none", background: AUB, color: "#fff", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 11.5, fontWeight: 700 }}>✓ {lang === "th" ? "เติมให้ครบทั้งหมด" : "Complete all"}</button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {intGaps.map((g, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 7, padding: "6px 10px", fontSize: 12 }}>
+                <span style={{ fontWeight: 700, color: AUB, flex: "1 1 140px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
+                <span style={{ color: GREY, flex: "0 0 auto" }}>{g.date || "—"}</span>
+                {g.board
+                  ? <span style={{ fontSize: 10.5, color: GREEN, fontWeight: 700, flex: "0 0 auto" }}>✓ board</span>
+                  : <button onClick={() => { if (pushUndo) pushUndo(); addGapBoard(g); }} style={{ border: `1px solid ${AUB}`, background: "#fff", color: AUB, borderRadius: 5, padding: "2px 8px", cursor: "pointer", fontSize: 10.5, fontWeight: 700, flex: "0 0 auto" }}>＋ board</button>}
+                {g.contact
+                  ? <span style={{ fontSize: 10.5, color: GREEN, fontWeight: 700, flex: "0 0 auto" }}>✓ contact</span>
+                  : <button onClick={() => { if (pushUndo) pushUndo(); addGapContact(g); }} style={{ border: `1px solid ${AUB}`, background: "#fff", color: AUB, borderRadius: 5, padding: "2px 8px", cursor: "pointer", fontSize: 10.5, fontWeight: 700, flex: "0 0 auto" }}>＋ contact</button>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ fontSize: 11, color: AMBER, marginBottom: 10 }}>● {L("dragHint")}</div>
       <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8 }}>
         {PHASES_IV.map(ph => { const items = indexed.filter(o => o.e.phase === ph.k); const isOver = dragOver === ph.k;
