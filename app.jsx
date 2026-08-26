@@ -3134,7 +3134,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   // paste-JSON import: append rows into matching stores, or replace everything with a full backup
   const [pasteText, setPasteText] = useState("");
   const [pasteMsg, setPasteMsg] = useState(null);
-  const IMPORT_STORES = ["timeline", "contacts", "events", "publications", "supervisor", "activity", "interviews", "tasks", "sources", "outputs", "ideas", "reflections", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence", "researchHistory", "researchPlan", "supervisorTeam"];
+  const IMPORT_STORES = ["timeline", "contacts", "events", "publications", "supervisor", "activity", "interviews", "tasks", "sources", "outputs", "ideas", "reflections", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence", "projects", "resources", "phdResources", "projectLog", "thesis", "writingSessions", "researchHistory", "researchPlan", "supervisorTeam"];
   const importPaste = mode => {
     let parsed;
     try { parsed = JSON.parse(pasteText); } catch (err) { setPasteMsg({ ok: false, text: lang === "th" ? "อ่าน JSON ไม่ได้ — ตรวจสอบรูปแบบ" : "Couldn't read that as JSON — check the format." }); return; }
