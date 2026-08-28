@@ -232,9 +232,10 @@ const cols = {
   ],
   events: [
     {k:"event",l:"Event",w:200},{k:"etype",l:"Type",w:110,type:"select",opts:["Conference","Workshop","Seminar","Networking","Training","Symposium","Other"]},
-    {k:"date",l:"Date",w:104},{k:"location",l:"Location",w:140},{k:"erole",l:"Role",w:100},
+    {k:"date",l:"Event date",w:104},{k:"endDate",l:"Event end",w:104},{k:"location",l:"Location",w:140},{k:"erole",l:"Role",w:100},
     {k:"status",l:"Status",w:140,type:"select",opts:["Idea","Abstract submitted","Registered","Attended","Presented","Not started"]},
-    {k:"deadline",l:"Abstract / reg. deadline",w:120},{k:"output",l:"Output produced",w:150},
+    {k:"abstractDue",l:"Abstract due",w:110},{k:"paperDue",l:"Paper due",w:110},{k:"regDue",l:"Register by",w:110},{k:"deadline",l:"Other deadline",w:120},
+    {k:"output",l:"Output produced",w:150},
     {k:"link",l:"Output location / link",w:200},{k:"cost",l:"Cost",w:70},{k:"funding",l:"Funding",w:100},{k:"notes",l:"Notes",w:200},
   ],
   publications: [
@@ -1478,7 +1479,7 @@ function TagCell({ value, onChange, suggestions, lang }) {
 }
 
 // date cell: type freely (also supports partial like 2024-01) OR pick from a calendar via 📅
-const DATE_COL_KEYS = ["date", "start", "end", "pStart", "pEnd", "aStart", "aEnd", "due", "deadline", "opens", "submitted", "captured"];
+const DATE_COL_KEYS = ["date", "start", "end", "pStart", "pEnd", "aStart", "aEnd", "due", "deadline", "opens", "submitted", "captured", "abstractDue", "paperDue", "regDue", "endDate", "lastSubmitted"];
 const isDateColumn = c => c.type ? false : (DATE_COL_KEYS.includes(c.k) || ((c.k === "first" || c.k === "last") && /contact/i.test(c.l || "")));
 function DateCell({ value, onChange, common }) {
   const ref = React.useRef(null);
@@ -3651,6 +3652,56 @@ function LecturerExport({ data, lang }) {
 }
 
 // ---- Events tab with type counts ----
+function daysUntil(dstr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dstr || "")) return null;
+  const d = new Date(dstr + "T00:00:00"); const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - now.getTime()) / 86400000);
+}
+function DeadlinesPanel({ data, lang }) {
+  const th = lang === "th";
+  const KINDS = [
+    { k: "abstractDue", label: th ? "บทคัดย่อ" : "Abstract", ic: "📝" },
+    { k: "paperDue", label: th ? "เปเปอร์" : "Paper", ic: "📄" },
+    { k: "regDue", label: th ? "ลงทะเบียน" : "Register", ic: "🎟️" },
+    { k: "deadline", label: th ? "เดดไลน์" : "Deadline", ic: "⏳" },
+    { k: "date", label: th ? "วันงาน" : "Event", ic: "🎪" },
+  ];
+  const items = [];
+  (data.events || []).forEach((e, idx) => {
+    if (!e.event || /^\[/.test(e.event)) return;
+    KINDS.forEach(kd => { const dd = daysUntil(e[kd.k]); if (dd == null || dd < -30) return; items.push({ event: e.event, kind: kd.label, ic: kd.ic, date: e[kd.k], days: dd }); });
+  });
+  items.sort((a, b) => a.days - b.days);
+  const within30 = items.filter(i => i.days >= 0 && i.days <= 30).length;
+  const within14 = items.filter(i => i.days >= 0 && i.days <= 14).length;
+  const col = d => (d <= 14 ? RED : d <= 30 ? AMBER : "#5B7080");
+  const cd = d => d < 0 ? (th ? `เลย ${-d} วัน` : `${-d}d ago`) : d === 0 ? (th ? "วันนี้!" : "today!") : (th ? `อีก ${d} วัน` : `in ${d}d`);
+  const dow = dstr => { const dt = new Date(dstr + "T00:00:00"); return dt.toLocaleDateString(th ? "th-TH" : "en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }); };
+
+  return (
+    <div style={{ background: OFF, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: AUB }}>⏰ {th ? "เดดไลน์ & นับถอยหลัง" : "Deadlines & countdown"}</div>
+        {within14 > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: RED, borderRadius: 999, padding: "2px 9px" }}>🔴 {within14} {th ? "ใน 2 สัปดาห์" : "in 2 weeks"}</span>}
+        {within30 - within14 > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: AMBER, borderRadius: 999, padding: "2px 9px" }}>🟠 {within30 - within14} {th ? "ใน 1 เดือน" : "in a month"}</span>}
+        <span style={{ fontSize: 10.5, color: GREY, marginLeft: "auto" }}>🔴 ≤2 {th ? "สัปดาห์" : "wk"} · 🟠 ≤1 {th ? "เดือน" : "mo"}</span>
+      </div>
+      {items.length === 0
+        ? <div style={{ fontSize: 12, color: GREY, padding: "6px 2px" }}>{th ? "ยังไม่มีเดดไลน์ที่จะถึง — ใส่วันที่ Abstract due / Paper due / Register by ในตารางด้านล่าง แล้วจะขึ้นนับถอยหลังที่นี่" : "No upcoming deadlines — add Abstract due / Paper due / Register by dates in the table below and they'll count down here."}</div>
+        : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {items.map((it, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${col(it.days)}`, borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#fff", background: col(it.days), borderRadius: 6, padding: "3px 9px", flex: "0 0 auto", minWidth: 74, textAlign: "center" }}>{cd(it.days)}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: AUB2, flex: "0 0 auto" }}>{it.ic} {it.kind}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: AUB, flex: "1 1 120px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.event}</span>
+                <span style={{ fontSize: 11, color: GREY, flex: "0 0 auto" }}>{dow(it.date)}</span>
+              </div>
+            ))}
+          </div>}
+    </div>
+  );
+}
+
 function EventsTab({ data, update, addRow, delRow, exportCSV, lang }) {
   const E = data.events || [];
   const types = ["Conference", "Workshop", "Seminar", "Networking", "Training", "Symposium", "Other"];
@@ -3660,6 +3711,7 @@ function EventsTab({ data, update, addRow, delRow, exportCSV, lang }) {
   const total = E.filter(r => r.event && !/^\[/.test(r.event)).length;
   return (
     <div>
+      <DeadlinesPanel data={data} lang={lang} />
       <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>🎪 {lang === "th" ? "สรุปกิจกรรมที่เข้าร่วม" : "Events attended — by type"}</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 14px" }}>
