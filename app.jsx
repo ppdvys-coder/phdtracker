@@ -429,9 +429,12 @@ const seed = () => { const S = ({
     row(ck,["[Spring School peer 4]","PhD researcher","[institution]","Network – workshop","Urban Digital Twin Spring School 2026 team","2026-05","","No","Add name + contact","KTU, Kaunas"],["name","org"]),
   ],
   events: [
-    row(ek,["Urban Digital Twin Spring School","Workshop","2026-05-11","KTU, Kaunas (LT)","Attendee","Attended","","Skills + network (4 PhD peers)","https://fcea.ktu.edu/spring-school-2026/","","","11–15 May 2026"]),
-    row(ek,["NVivo 15 training","Training","","UCL (online)","Attendee","Not started","","Skills / certificate","","Free","UCL licence","Institutional support available"]),
-    row(ek,["[Add target conference]","Conference","","","Presenter","Idea","","Abstract / paper","","","","e.g. CIB, EuroFM, ARCOM"],["event"]),
+    { _a:[], event:"Urban Digital Twin Spring School", etype:"Workshop", date:"2026-05-11", endDate:"2026-05-15", location:"KTU, Kaunas (LT)", erole:"Attendee", status:"Attended", abstractDue:"", paperDue:"", regDue:"", deadline:"", output:"Skills + network (4 PhD peers)", link:"https://fcea.ktu.edu/spring-school-2026/", cost:"", funding:"", notes:"11–15 May 2026" },
+    { _a:[], event:"NVivo 15 training", etype:"Training", date:"", endDate:"", location:"UCL (online)", erole:"Attendee", status:"Not started", abstractDue:"", paperDue:"", regDue:"", deadline:"", output:"Skills / certificate", link:"", cost:"Free", funding:"UCL licence", notes:"Institutional support available" },
+    { _a:["event"], event:"[Add target conference]", etype:"Conference", date:"", endDate:"", location:"", erole:"Presenter", status:"Idea", abstractDue:"", paperDue:"", regDue:"", deadline:"", output:"Abstract / paper", link:"", cost:"", funding:"", notes:"e.g. CIB, EuroFM, ARCOM" },
+  ],
+  conferences: [
+    { _a:[], name:"PRRES 2027 — 33rd Annual Conference + PhD Colloquium", series:"PRRES, annual", url:"http://www.prres.net/", targetYear:"2027", date:"2027-01-17", endDate:"", location:"Curtin University, Perth, WA (Bentley)", abstractDue:"2026-09-30", paperDue:"", regDue:"2026-11-30", status:"Planning", lastChecked:"", notes:"PhD Colloquium (Sun 17 Jan 2027). Submit 3-page research summary + 150-word abstract + application form + supervisor declaration (PRRES-member supervisor) + enrolment evidence to Dr Wejen Reddy (wejendra.reddy@rmit.edu.au) by 30 Sep 2026. Register for the conference by 30 Nov 2026 (PhD = early-bird rate). Acceptance advised 16 Nov 2026. Need a paper in the main conference (refereed/non-refereed). Scholarship AUD1,500 (2nd–4th-yr full-time, property topic); Best Paper AUD400 (1st yr); Best Presenter AUD400. Summary format: Word A4, TNR 12, single-space, Harvard, filename surname_colloquium. Guidelines + forms: prres.net (+ PDFs saved locally)." },
   ],
   publications: [
     row(pk,["Defining digital readiness in university EFM","1","Conceptual / definitional","J. of Corporate Real Estate","Pun + TU Delft","Drafting","Rolling","","","","","Series opener"],["paper"]),
@@ -608,6 +611,7 @@ const TABS = [
   {k:"publications", group:"phd", ic:"📄", en:"Publications", th:"ผลงานตีพิมพ์"},
   {k:"supervisor", group:"phd", ic:"🧑‍🏫", en:"Supervisor", th:"อาจารย์ที่ปรึกษา"},
   {k:"events", group:"phd", ic:"🎓", en:"Events & Training", th:"กิจกรรม & อบรม"},
+  {k:"conferences", group:"phd", ic:"🎯", en:"Conferences", th:"งานประชุม"},
   {k:"phdResources", group:"phd", ic:"📓", en:"PhD Resources", th:"แหล่งข้อมูล PhD"},
   {k:"lecdash", group:"bssc", ic:"🍎", en:"Lecturer Dashboard", th:"แดชบอร์ดอาจารย์"},
   {k:"teachingSessions", group:"bssc", ic:"📚", en:"Teaching Sessions", th:"คาบสอน"},
@@ -1055,7 +1059,7 @@ function App() {
 }
 
 // ---- Trash bin: view / restore / empty soft-deleted rows ----
-const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence", resources: "Resources", phdResources: "PhD Resources", writingSessions: "Writing sessions", thesis: "Thesis chapters", projectLog: "Project notes" };
+const TRASH_STORE_LABELS = { timeline: "Timeline", contacts: "Contacts", events: "Events", publications: "Publications", supervisor: "Supervisor log", activity: "Activity", interviews: "Interviews", tasks: "Tasks", sources: "Sources", outputs: "Outputs", ideas: "Ideas", reflections: "Reflections", teachingSessions: "Teaching sessions", guestLectures: "Guest lectures", supervision: "Supervision", marking: "Marking", teachingEvidence: "Teaching evidence", resources: "Resources", phdResources: "PhD Resources", writingSessions: "Writing sessions", thesis: "Thesis chapters", projectLog: "Project notes", conferences: "Conferences" };
 function trashLabel(row) {
   if (!row || typeof row !== "object") return "(item)";
   const v = row.activity || row.name || row.title || row.task || row.event || row.paper || row.agenda || row.idea || row.reflection || (row.first ? `${row.first} ${row.last || ""}`.trim() : "") || "";
@@ -1290,7 +1294,7 @@ function ProjectDetail({ idx, data, setData, update, addRowWith, delRow, pushUnd
   );
 }
 
-const SEARCH_STORES = ["activity", "tasks", "projects", "projectLog", "resources", "phdResources", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
+const SEARCH_STORES = ["activity", "tasks", "projects", "projectLog", "resources", "phdResources", "conferences", "contacts", "supervisor", "publications", "interviews", "outputs", "ideas", "reflections", "sources", "events", "timeline", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence"];
 function SearchResults({ data, q, setQ, goSearch, setTab, setGroup, lang }) {
   const T = (th, en) => lang === "th" ? th : en;
   const query = (q || "").trim().toLowerCase();
@@ -3189,7 +3193,7 @@ function AddHub({ data, setData, quickAdd, pushUndo, lang }) {
   // paste-JSON import: append rows into matching stores, or replace everything with a full backup
   const [pasteText, setPasteText] = useState("");
   const [pasteMsg, setPasteMsg] = useState(null);
-  const IMPORT_STORES = ["timeline", "contacts", "events", "publications", "supervisor", "activity", "interviews", "tasks", "sources", "outputs", "ideas", "reflections", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence", "projects", "resources", "phdResources", "projectLog", "thesis", "writingSessions", "researchHistory", "researchPlan", "supervisorTeam"];
+  const IMPORT_STORES = ["timeline", "contacts", "events", "publications", "supervisor", "activity", "interviews", "tasks", "sources", "outputs", "ideas", "reflections", "teachingSessions", "guestLectures", "supervision", "marking", "teachingEvidence", "projects", "resources", "phdResources", "projectLog", "thesis", "writingSessions", "conferences", "researchHistory", "researchPlan", "supervisorTeam"];
   const importPaste = mode => {
     let parsed;
     try { parsed = JSON.parse(pasteText); } catch (err) { setPasteMsg({ ok: false, text: lang === "th" ? "อ่าน JSON ไม่ได้ — ตรวจสอบรูปแบบ" : "Couldn't read that as JSON — check the format." }); return; }
@@ -3724,6 +3728,21 @@ function DeadlinesPanel({ data, lang, addRowWith, pushUndo, hideWhenEmpty }) {
               </div>
             ))}
           </div>}
+    </div>
+  );
+}
+
+function ConferencesTab({ data, update, addRow, addRowWith, delRow, exportCSV, pushUndo, lang }) {
+  const th = lang === "th";
+  const C = data.conferences || [];
+  const byStatus = ["Watching", "Planning", "Abstract submitted", "Registered", "Going", "Attended", "Skipped"].map(s => ({ s, n: C.filter(r => r.status === s).length })).filter(x => x.n);
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: AUB, marginBottom: 2 }}>🎯 {th ? "งานประชุม (Watchlist)" : "Conference watchlist"}</div>
+      <div style={{ fontSize: 12, color: GREY, marginBottom: 12 }}>{th ? "เก็บงานประชุมที่สนใจไปปีถัด ๆ ไป — พอประกาศกำหนดการ/เดดไลน์ค่อยมาอัปเดต แล้วมันจะไปนับถอยหลังใน Dashboard + Events ให้เอง" : "Track conferences to consider in future years — update the dates/deadlines when announced and they count down on the Dashboard + Events."}</div>
+      {byStatus.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{byStatus.map(({ s, n }) => (<span key={s} style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: STAT_COLOR[s] || GREY, borderRadius: 6, padding: "3px 9px" }}>{s} · {n}</span>))}</div>}
+      <DeadlinesPanel data={data} lang={lang} addRowWith={addRowWith} pushUndo={pushUndo} />
+      <TableTab tabKey="conferences" data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} sortKey="date" sortDir="asc" />
     </div>
   );
 }
