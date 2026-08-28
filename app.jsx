@@ -99,7 +99,8 @@ const STAT_COLOR = { "Completed":GREEN,"In progress":AMBER,"Not started":GREY,"B
   "Registered":AMBER,"Abstract submitted":AMBER,"Idea":GREY,"Accepted":GREEN,"Under review":AMBER,"Submitted":AMBER,
   "Drafting":GREY,"Outline":GREY,"Planned":GREY,"Revisions":AMBER,"Rejected":RED,"Yes":AMBER,"No":GREY,
   "Done":GREEN,"Awaiting":AMBER,"New":GREY,"Exploring":AMBER,"Parked":GREY,"Using":GREEN,"Dropped":RED,"Active":GREEN,"On hold":AMBER,
-  "To read":GREY,"Draft":AMBER,"In review":AMBER,"Final":GREEN,"Archived":"#9E9E9E" };
+  "To read":GREY,"Draft":AMBER,"In review":AMBER,"Final":GREEN,"Archived":"#9E9E9E",
+  "Watching":GREY,"Planning":AMBER,"Going":GREEN,"Skipped":"#9E9E9E" };
 
 // ---- Thesis writing ----
 const THESIS_STATUS = ["Not started","Outlining","Drafting","Revising","Done"];
@@ -237,6 +238,13 @@ const cols = {
     {k:"abstractDue",l:"Abstract due",w:110},{k:"paperDue",l:"Paper due",w:110},{k:"regDue",l:"Register by",w:110},{k:"deadline",l:"Other deadline",w:120},
     {k:"output",l:"Output produced",w:150},
     {k:"link",l:"Output location / link",w:200},{k:"cost",l:"Cost",w:70},{k:"funding",l:"Funding",w:100},{k:"notes",l:"Notes",w:200},
+  ],
+  conferences: [
+    {k:"name",l:"Conference",w:220},{k:"series",l:"Series / host",w:150,type:"tags"},{k:"url",l:"Website / CFP",w:220,type:"link"},
+    {k:"targetYear",l:"Target year",w:90},{k:"date",l:"Event date",w:104},{k:"endDate",l:"Event end",w:104},{k:"location",l:"Location",w:150},
+    {k:"abstractDue",l:"Abstract due",w:110},{k:"paperDue",l:"Paper due",w:110},{k:"regDue",l:"Register by",w:110},
+    {k:"status",l:"Status",w:140,type:"select",opts:["Watching","Planning","Abstract submitted","Registered","Going","Attended","Skipped"]},
+    {k:"lastChecked",l:"Last checked",w:104},{k:"notes",l:"Notes",w:320},
   ],
   publications: [
     {k:"paper",l:"Paper (working title)",w:240},{k:"series",l:"Series #",w:70},{k:"ptype",l:"Type",w:140},
@@ -1025,7 +1033,8 @@ function App() {
           : tab === "teaching" ? <TeachingTab data={data} lang={lang} />
           : tab === "lecdash" ? <LecturerDashboard data={data} setTab={setTab} lang={lang} />
           : tab === "lecexport" ? <LecturerExport data={data} lang={lang} />
-          : tab === "events" ? <EventsTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} lang={lang} />
+          : tab === "events" ? <EventsTab data={data} update={update} addRow={addRow} addRowWith={addRowWith} delRow={delRow} exportCSV={exportCSV} pushUndo={pushUndo} lang={lang} />
+          : tab === "conferences" ? <ConferencesTab data={data} update={update} addRow={addRow} addRowWith={addRowWith} delRow={delRow} exportCSV={exportCSV} pushUndo={pushUndo} lang={lang} />
           : tab === "supervisor" ? <SupervisorTab data={data} update={update} addRow={addRow} delRow={delRow} exportCSV={exportCSV} goSearch={goSearch} lang={lang} />
           : tab === "add" ? <AddHub data={data} setData={setData} quickAdd={quickAdd} pushUndo={pushUndo} lang={lang} />
           : tab === "reports" ? <ReportsHub data={data} lang={lang} />
@@ -1340,6 +1349,7 @@ function Dashboard({ m, data, update, setTab, resetAll, lang }) {
   const activeRoles = m.roleAgg.filter(r => r.count > 0).slice().sort((a, b) => RORDER.indexOf(a.role) - RORDER.indexOf(b.role));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <DeadlinesPanel data={data} lang={lang} hideWhenEmpty />
       <TaskTracker data={data} update={update} setTab={setTab} lang={lang} />
       <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: AUB }}>{L("actSummary")}</div>
@@ -3657,19 +3667,23 @@ function daysUntil(dstr) {
   const d = new Date(dstr + "T00:00:00"); const now = new Date(); now.setHours(0, 0, 0, 0);
   return Math.round((d.getTime() - now.getTime()) / 86400000);
 }
-function DeadlinesPanel({ data, lang }) {
+function DeadlinesPanel({ data, lang, addRowWith, pushUndo, hideWhenEmpty }) {
   const th = lang === "th";
   const KINDS = [
-    { k: "abstractDue", label: th ? "บทคัดย่อ" : "Abstract", ic: "📝" },
-    { k: "paperDue", label: th ? "เปเปอร์" : "Paper", ic: "📄" },
-    { k: "regDue", label: th ? "ลงทะเบียน" : "Register", ic: "🎟️" },
-    { k: "deadline", label: th ? "เดดไลน์" : "Deadline", ic: "⏳" },
-    { k: "date", label: th ? "วันงาน" : "Event", ic: "🎪" },
+    { k: "abstractDue", label: th ? "บทคัดย่อ" : "Abstract", ic: "📝", act: th ? "ส่งบทคัดย่อ" : "Submit abstract" },
+    { k: "paperDue", label: th ? "เปเปอร์" : "Paper", ic: "📄", act: th ? "ส่งเปเปอร์" : "Submit paper" },
+    { k: "regDue", label: th ? "ลงทะเบียน" : "Register", ic: "🎟️", act: th ? "ลงทะเบียน" : "Register for" },
+    { k: "deadline", label: th ? "เดดไลน์" : "Deadline", ic: "⏳", act: th ? "เดดไลน์" : "Deadline" },
+    { k: "date", label: th ? "วันงาน" : "Event", ic: "🎪", act: th ? "เข้าร่วม" : "Attend" },
+  ];
+  const src = [
+    ...(data.events || []).map(e => ({ ...e, _name: e.event })),
+    ...(data.conferences || []).map(c => ({ ...c, _name: c.name })),
   ];
   const items = [];
-  (data.events || []).forEach((e, idx) => {
-    if (!e.event || /^\[/.test(e.event)) return;
-    KINDS.forEach(kd => { const dd = daysUntil(e[kd.k]); if (dd == null || dd < -30) return; items.push({ event: e.event, kind: kd.label, ic: kd.ic, date: e[kd.k], days: dd }); });
+  src.forEach(e => {
+    if (!e._name || /^\[/.test(e._name)) return;
+    KINDS.forEach(kd => { const dd = daysUntil(e[kd.k]); if (dd == null || dd < -30) return; items.push({ event: e._name, kind: kd.label, kindKey: kd.k, act: kd.act, ic: kd.ic, date: e[kd.k], days: dd }); });
   });
   items.sort((a, b) => a.days - b.days);
   const within30 = items.filter(i => i.days >= 0 && i.days <= 30).length;
@@ -3677,17 +3691,29 @@ function DeadlinesPanel({ data, lang }) {
   const col = d => (d <= 14 ? RED : d <= 30 ? AMBER : "#5B7080");
   const cd = d => d < 0 ? (th ? `เลย ${-d} วัน` : `${-d}d ago`) : d === 0 ? (th ? "วันนี้!" : "today!") : (th ? `อีก ${d} วัน` : `in ${d}d`);
   const dow = dstr => { const dt = new Date(dstr + "T00:00:00"); return dt.toLocaleDateString(th ? "th-TH" : "en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }); };
+  const slug = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 28);
+  const genTasks = () => {
+    const have = new Set((data.tasks || []).map(t => t._id).filter(Boolean));
+    const news = items.filter(it => it.days >= 0).map(it => ({ _a: [], _id: "evtdl-" + slug(it.event) + "-" + it.kindKey, title: `${it.act} — ${it.event}`, status: "Not started", role: "PhD", category: "Event deadline", due: it.date, notes: `${it.kind} · auto from Events` })).filter(t => !have.has(t._id));
+    if (!news.length) { window.alert(th ? "สร้าง Task ครบแล้ว — ไม่มีเดดไลน์ใหม่" : "All deadlines already have tasks."); return; }
+    if (!window.confirm(th ? `สร้าง ${news.length} Task จากเดดไลน์ที่จะถึง? (อันไหนไม่เอา ลบใน Tasks เองได้)` : `Create ${news.length} task(s) from upcoming deadlines? (delete any you don't want in the Tasks board)`)) return;
+    if (pushUndo) pushUndo();
+    news.forEach(t => addRowWith("tasks", t));
+    window.alert(th ? `สร้าง ${news.length} Task แล้ว → ไปดูแท็บ ✅ Tasks` : `Created ${news.length} task(s) → see the ✅ Tasks board`);
+  };
 
+  if (hideWhenEmpty && items.length === 0) return null;
   return (
     <div style={{ background: OFF, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: AUB }}>⏰ {th ? "เดดไลน์ & นับถอยหลัง" : "Deadlines & countdown"}</div>
         {within14 > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: RED, borderRadius: 999, padding: "2px 9px" }}>🔴 {within14} {th ? "ใน 2 สัปดาห์" : "in 2 weeks"}</span>}
         {within30 - within14 > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: AMBER, borderRadius: 999, padding: "2px 9px" }}>🟠 {within30 - within14} {th ? "ใน 1 เดือน" : "in a month"}</span>}
+        {addRowWith && items.some(i => i.days >= 0) && <button onClick={genTasks} title={th ? "สร้าง Task จากเดดไลน์ที่จะถึง (กันซ้ำอัตโนมัติ)" : "create Tasks from upcoming deadlines (de-duplicated)"} style={{ border: `1px solid ${AUB}`, background: "#fff", color: AUB, borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>✅ {th ? "สร้าง Task" : "Make Tasks"}</button>}
         <span style={{ fontSize: 10.5, color: GREY, marginLeft: "auto" }}>🔴 ≤2 {th ? "สัปดาห์" : "wk"} · 🟠 ≤1 {th ? "เดือน" : "mo"}</span>
       </div>
       {items.length === 0
-        ? <div style={{ fontSize: 12, color: GREY, padding: "6px 2px" }}>{th ? "ยังไม่มีเดดไลน์ที่จะถึง — ใส่วันที่ Abstract due / Paper due / Register by ในตารางด้านล่าง แล้วจะขึ้นนับถอยหลังที่นี่" : "No upcoming deadlines — add Abstract due / Paper due / Register by dates in the table below and they'll count down here."}</div>
+        ? <div style={{ fontSize: 12, color: GREY, padding: "6px 2px" }}>{th ? "ยังไม่มีเดดไลน์ที่จะถึง — ใส่วันที่ Abstract due / Paper due / Register by ในตาราง Events หรือ Conference watchlist แล้วจะขึ้นนับถอยหลังที่นี่" : "No upcoming deadlines — add Abstract due / Paper due / Register by dates to an event or a conference and they'll count down here."}</div>
         : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {items.map((it, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${col(it.days)}`, borderRadius: 8, padding: "8px 12px" }}>
@@ -3702,7 +3728,7 @@ function DeadlinesPanel({ data, lang }) {
   );
 }
 
-function EventsTab({ data, update, addRow, delRow, exportCSV, lang }) {
+function EventsTab({ data, update, addRow, addRowWith, delRow, exportCSV, pushUndo, lang }) {
   const E = data.events || [];
   const types = ["Conference", "Workshop", "Seminar", "Networking", "Training", "Symposium", "Other"];
   const counts = {}; types.forEach(t => counts[t] = 0);
@@ -3711,7 +3737,7 @@ function EventsTab({ data, update, addRow, delRow, exportCSV, lang }) {
   const total = E.filter(r => r.event && !/^\[/.test(r.event)).length;
   return (
     <div>
-      <DeadlinesPanel data={data} lang={lang} />
+      <DeadlinesPanel data={data} lang={lang} addRowWith={addRowWith} pushUndo={pushUndo} />
       <div style={{ fontSize: 13, fontWeight: 800, color: AUB, marginBottom: 8 }}>🎪 {lang === "th" ? "สรุปกิจกรรมที่เข้าร่วม" : "Events attended — by type"}</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 14px" }}>
